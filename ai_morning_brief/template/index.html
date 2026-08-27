@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 信号早报</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --paper: #ffffff;
+      --ink: #10243a;
+      --muted: #5c6c81;
+      --line: #dbe5ef;
+      --blue: #2456c9;
+      --orange: #a95124;
+      --teal: #1c706c;
+      --blue-soft: #e7efff;
+      --orange-soft: #fff0e6;
+      --teal-soft: #e5f6f4;
+      /* HyperFrames resolves these canonical families deterministically. */
+      --font-display: "Noto Sans JP", sans-serif;
+      --font-body: "Noto Sans JP", sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { background: var(--bg); color: var(--ink); font-family: "Noto Sans JP", sans-serif; -webkit-font-smoothing: antialiased; }
+    #root-composition { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+    #root-composition::before { content: ""; position: absolute; inset: -30% -10% auto auto; width: 72%; height: 90%; background: radial-gradient(circle at 58% 42%, rgba(255,138,69,.17), rgba(255,138,69,0) 60%); pointer-events: none; }
+    #root-composition::after { content: ""; position: absolute; inset: 0; opacity: .32; pointer-events: none; background-image: linear-gradient(rgba(16,36,58,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(16,36,58,.035) 1px, transparent 1px); background-size: 80px 80px; }
+    .masthead { position: absolute; z-index: 20; top: 0; left: 0; right: 0; height: 94px; display: flex; align-items: center; padding: 0 70px; border-bottom: 1px solid var(--line); background: rgba(244,247,251,.93); backdrop-filter: blur(12px); }
+    .brand { display: flex; align-items: baseline; gap: 18px; font-size: 27px; font-weight: 900; letter-spacing: -.07em; color: var(--ink); }
+    .brand b { color: var(--blue); font-family: "JetBrains Mono", monospace; font-size: 17px; letter-spacing: .02em; }
+    .date { margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 17px; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+    .nav { position: absolute; z-index: 21; top: 94px; left: 70px; right: 70px; height: 46px; display: flex; align-items: center; gap: 10px; }
+    .nav-chip { padding: 6px 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255,255,255,.76); font-size: 14px; }
+    .nav-chip:first-child { color: var(--blue); border-color: rgba(47,107,255,.3); background: var(--blue-soft); }
+    .scenes { position: absolute; inset: 140px 0 0; z-index: 2; }
+    .scene { position: absolute; inset: 0; padding: 62px 70px 78px; visibility: hidden; opacity: 0; }
+    .intro-scene, .outro-scene { display: flex; align-items: center; justify-content: center; text-align: center; }
+    .intro-content, .outro-content { position: relative; z-index: 2; max-width: 1200px; }
+    .eyebrow { color: var(--teal); font: 800 17px/1.2 "JetBrains Mono", monospace; letter-spacing: .18em; text-transform: uppercase; }
+    .intro-content h1 { margin: 22px 0 18px; font-size: 110px; line-height: .98; letter-spacing: -.09em; }
+    .intro-content p, .outro-content p { margin: 0 auto; max-width: 900px; color: var(--muted); font-size: 28px; line-height: 1.55; }
+    .intro-meta { display: flex; justify-content: center; gap: 24px; margin-top: 34px; color: var(--orange); font: 700 15px/1 "JetBrains Mono", monospace; letter-spacing: .1em; }
+    .intro-orbit { position: absolute; width: 620px; height: 620px; border: 1px solid rgba(47,107,255,.18); border-radius: 50%; transform: translate(350px,-110px); }
+    .intro-orbit::before, .intro-orbit::after { content: ""; position: absolute; inset: 46px; border: 1px solid rgba(48,184,178,.22); border-radius: 50%; }
+    .intro-orbit::after { inset: 128px; border-color: rgba(255,138,69,.28); }
+    .outro-scene { background: var(--ink); color: white; }
+    .outro-content h1 { margin: 22px 0 18px; font-size: 118px; letter-spacing: -.08em; }
+    .outro-content p { color: rgba(255,255,255,.72); }
+    .outro-line { width: 130px; height: 7px; margin: 34px auto 0; border-radius: 99px; background: var(--orange); }
+    .news-scene { display: flex; flex-direction: column; }
+    .story-top, .story-footer { display: flex; align-items: center; gap: 18px; }
+    .story-index { color: var(--blue); font: 900 24px/1 "JetBrains Mono", monospace; }
+    .story-index span { color: var(--muted); font-size: 13px; font-weight: 600; }
+    .category-label { padding: 8px 15px; border-radius: 999px; color: var(--ink); background: var(--blue-soft); font-size: 17px; font-weight: 800; }
+    .live-dot { margin-left: auto; color: var(--muted); font: 700 13px/1 "JetBrains Mono", monospace; letter-spacing: .08em; }
+    .live-dot::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 5px rgba(255,138,69,.12); }
+    .story-body { display: grid; grid-template-columns: minmax(0, 1.07fr) minmax(540px, .93fr); gap: 60px; align-items: center; flex: 1; padding: 24px 0 30px; }
+    .story-copy { align-self: start; padding-top: 58px; }
+    .story-copy h2 { max-width: 1060px; margin: 20px 0 25px; font-size: 69px; line-height: 1.08; letter-spacing: -.065em; }
+    .story-lede { max-width: 1000px; margin: 0; color: #3d536b; font-size: 28px; line-height: 1.58; }
+    .story-visual { position: relative; min-height: 420px; display: flex; align-items: center; }
+    .point-grid { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 15px; align-items: stretch; }
+    .point-card { position: relative; min-height: 240px; padding: 25px 24px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: 0 22px 52px rgba(16,36,58,.08); }
+    .point-card::after { content: ""; position: absolute; left: 24px; right: 24px; bottom: 22px; height: 4px; border-radius: 99px; background: currentColor; opacity: .22; }
+    .point-card.blue { color: var(--blue); background: linear-gradient(155deg, #fff, #f3f7ff); }
+    .point-card.orange { color: #a95124; background: linear-gradient(155deg, #fff, var(--orange-soft)); }
+    .point-card.teal { color: #0d7772; background: linear-gradient(155deg, #fff, var(--teal-soft)); }
+    .point-card.empty { color: var(--muted); }
+    .point-index { font: 800 15px/1 "JetBrains Mono", monospace; letter-spacing: .1em; }
+    .point-card p { margin: 42px 0 0; color: var(--ink); font-size: 27px; line-height: 1.27; font-weight: 800; letter-spacing: -.04em; }
+    .point-card.empty p { color: var(--muted); font-size: 20px; font-weight: 600; }
+    .point-card small { display: block; margin-top: 34px; color: var(--muted); font-size: 16px; }
+    .signal-sweep { position: absolute; right: -70px; top: 12%; width: 360px; height: 360px; border: 1px solid rgba(47,107,255,.16); border-radius: 50%; pointer-events: none; }
+    .signal-sweep::before, .signal-sweep::after { content: ""; position: absolute; inset: 38px; border: 1px solid rgba(48,184,178,.18); border-radius: 50%; }
+    .signal-sweep::after { inset: 90px; border-color: rgba(255,138,69,.22); }
+    .story-footer { margin-top: auto; padding-top: 17px; border-top: 1px solid var(--line); }
+    .source-pill { padding: 9px 14px; border-radius: 10px; color: var(--ink); background: white; font-size: 16px; font-weight: 700; }
+    .story-hint { margin-left: auto; color: var(--muted); font: 13px/1 "JetBrains Mono", monospace; }
+    .caption-layer { position: absolute; z-index: 30; left: 50%; bottom: 32px; transform: translateX(-50%); width: min(980px, calc(100% - 260px)); text-align: center; pointer-events: none; }
+    .caption { display: none; padding: 15px 25px; border-radius: 14px; color: #fff; background: rgba(16,36,58,.92); box-shadow: 0 16px 36px rgba(16,36,58,.18); font-size: 26px; line-height: 1.35; }
+    .progress { position: absolute; z-index: 22; left: 70px; bottom: 19px; right: 70px; height: 3px; background: var(--line); }
+    .progress::after { content: ""; display: block; width: 27%; height: 100%; background: var(--blue); }
+  </style>
+</head>
+<body>
+  <div id="root-composition" data-composition-id="root" data-start="0" data-duration="__TOTAL_DURATION__" data-width="1920" data-height="1080">
+    <header class="masthead"><div class="brand"><span>AI 信号早报</span><b>08:00 / DAILY</b></div><div class="date">__DATE__</div></header>
+    <nav class="nav">__NAV_MARKUP__</nav>
+    <main class="scenes">__SCENES__</main>
+    <div class="caption-layer">__CAPTIONS__</div>
+    <div class="progress"></div>
+    <audio id="final-mix" class="clip" src="assets/audio/final-mix.wav" data-start="0" data-duration="__TOTAL_DURATION__" data-track-index="4"></audio>
+    <script>
+      /*
+       * A tiny deterministic GSAP-compatible timeline surface. OpenMontage
+       * only needs paused timelines with seek()/duration() for frame capture;
+       * keeping this surface inline avoids a render-time CDN dependency while
+      * preserving the authored `gsap.timeline` contract.
+      */
+      (function installDeterministicGsap() {
+        const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value));
+        const numeric = (value, fallback = 0) => {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : fallback;
+        };
+        const elementsFor = (target) => {
+          if (typeof target === "string") return Array.from(document.querySelectorAll(target));
+          if (target && target.nodeType) return [target];
+          if (Array.isArray(target)) return target.filter((item) => item && item.nodeType);
+          return [];
+        };
+        const baseState = (element) => ({
+          opacity: numeric(getComputedStyle(element).opacity, 1),
+          visibility: getComputedStyle(element).visibility || "visible",
+          display: getComputedStyle(element).display || "block",
+          x: 0,
+          y: 0,
+          scale: 1,
+          transform: element.style.transform || ""
+        });
+        const stateFor = (states, element) => {
+          if (!states.has(element)) states.set(element, baseState(element));
+          return states.get(element);
+        };
+        const setProperty = (element, property, value, states) => {
+          const state = stateFor(states, element);
+          if (property === "autoAlpha") {
+            const alpha = numeric(value, 1);
+            state.opacity = alpha;
+            element.style.opacity = String(alpha);
+            element.style.visibility = alpha <= 0 ? "hidden" : "visible";
+          } else if (property === "opacity") {
+            state.opacity = numeric(value, 1);
+            element.style.opacity = String(state.opacity);
+            element.style.visibility = state.opacity <= 0 ? "hidden" : "visible";
+          } else if (property === "display") {
+            element.style.display = String(value);
+          } else if (property === "x" || property === "y" || property === "scale") {
+            state[property] = numeric(value, property === "scale" ? 1 : 0);
+            element.style.transform = `translate3d(${state.x}px, ${state.y}px, 0) scale(${state.scale})`;
+            element.style.visibility = "visible";
+          }
+        };
+        const interpolate = (element, step, progress, states) => {
+          const props = step.props || {};
+          for (const [property, rawValue] of Object.entries(props)) {
+            if (["duration", "ease", "stagger", "overwrite"].includes(property)) continue;
+            const value = numeric(rawValue, rawValue);
+            const startValue = step.from ? numeric(rawValue, property === "scale" ? 1 : 0) : step.starts[property];
+            const endValue = step.from ? step.ends[property] : value;
+            if (typeof startValue === "number" && typeof endValue === "number") {
+              setProperty(element, property, startValue + (endValue - startValue) * progress, states);
+            } else if (progress >= 1) {
+              setProperty(element, property, endValue, states);
+            }
+          }
+        };
+        const timeline = () => {
+          const steps = [];
+          const states = new Map();
+          let total = 0;
+          let currentTime = 0;
+          const add = (kind, target, vars = {}, position = 0) => {
+            const start = numeric(position, 0);
+            const duration = kind === "set" ? 0 : Math.max(0, numeric(vars.duration, 0));
+            const stagger = Math.max(0, numeric(vars.stagger, 0));
+            elementsFor(target).forEach((element, index) => {
+              const stepStart = start + index * stagger;
+              const starts = {};
+              const ends = {};
+              for (const [property, rawValue] of Object.entries(vars)) {
+                if (["duration", "ease", "stagger", "overwrite"].includes(property)) continue;
+                const state = stateFor(states, element);
+                starts[property] = property === "autoAlpha" ? state.opacity : (property === "opacity" ? state.opacity : (property === "scale" ? state.scale : 0));
+                ends[property] = kind === "from"
+                  ? ((property === "autoAlpha" || property === "opacity") ? state.opacity : (property === "scale" ? state.scale : 0))
+                  : numeric(rawValue, property === "scale" ? 1 : 0);
+              }
+              steps.push({ kind, element, props: vars, start: stepStart, end: stepStart + duration, duration, from: kind === "from", starts, ends });
+              total = Math.max(total, stepStart + duration);
+            });
+            return api;
+          };
+          const api = {
+            set: (target, vars, position) => add("set", target, vars, position),
+            to: (target, vars, position) => add("to", target, vars, position),
+            from: (target, vars, position) => add("from", target, vars, position),
+            fromTo: (target, fromVars, toVars, position) => {
+              add("from", target, fromVars, position);
+              return add("to", target, toVars, position);
+            },
+            seek: (time) => {
+              const current = Math.max(0, numeric(time, 0));
+              currentTime = current;
+              for (const [element, state] of states.entries()) {
+                element.style.opacity = String(state.opacity);
+                element.style.visibility = state.visibility;
+                element.style.display = state.display;
+                element.style.transform = state.transform;
+              }
+              for (const step of steps) {
+                if (step.kind === "set") {
+                  if (current >= step.start) interpolate(step.element, step, 1, states);
+                } else if (current >= step.start) {
+                  interpolate(step.element, step, clamp((current - step.start) / Math.max(step.duration, 0.0001)), states);
+                }
+              }
+              return api;
+            },
+            pause: () => api,
+            play: () => api,
+            kill: () => api,
+            timeScale: (value) => (value === undefined ? 1 : api),
+            totalTime: (value) => {
+              if (value === undefined) return currentTime;
+              return api.seek(value);
+            },
+            time: (value) => {
+              if (value === undefined) return currentTime;
+              return api.seek(value);
+            },
+            paused: (value) => (value === undefined ? true : api),
+            getChildren: () => [],
+            duration: () => total,
+            totalDuration: () => total,
+            progress: (value) => (value === undefined ? (total ? currentTime / total : 0) : api.seek(total * numeric(value, 0)))
+          };
+          return api;
+        };
+        window.gsap = { timeline };
+      })();
+      window.__timelines = window.__timelines || {};
+      const sceneSpecs = __SCENE_SPECS__;
+      const captionSpecs = __CUE_SPECS__;
+      const tl = gsap.timeline({ paused: true });
+      sceneSpecs.forEach((scene, i) => {
+        const root = `#${scene.id}`;
+        tl.set(root, { autoAlpha: 0 }, scene.start);
+        tl.to(root, { autoAlpha: 1, duration: 0.28, ease: "power2.out" }, scene.start);
+        if (document.querySelector(root + " .story-top")) tl.from(root + " .story-top", { y: 14, opacity: 0, duration: 0.35, ease: "power2.out" }, scene.start + 0.08);
+        if (document.querySelector(root + " .story-copy")) tl.from(root + " .story-copy", { x: -24, opacity: 0, duration: 0.56, ease: "power3.out" }, scene.start + 0.18);
+        if (document.querySelector(root + " .point-card")) tl.from(root + " .point-card", { y: 30, opacity: 0, duration: 0.42, stagger: 0.08, ease: "back.out(1.1)" }, scene.start + 0.30);
+        if (document.querySelector(root + " .story-footer")) tl.from(root + " .story-footer", { y: 12, opacity: 0, duration: 0.32, ease: "power2.out" }, scene.start + 0.55);
+        tl.to(root, { autoAlpha: 0, duration: 0.24, ease: "power2.in" }, Math.max(scene.start + 0.8, scene.end - 0.24));
+      });
+      captionSpecs.forEach((cue, i) => {
+        const node = `#caption-${String(i + 1).padStart(4, "0")}`;
+        tl.set(node, { display: "block", autoAlpha: 1 }, cue.start);
+        tl.set(node, { display: "none", autoAlpha: 0 }, cue.end);
+      });
+      window.__timelines["root"] = tl;
+    </script>
+  </div>
+</body>
+</html>
