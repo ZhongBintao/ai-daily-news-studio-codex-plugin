@@ -18,14 +18,25 @@ class MaterializeTests(unittest.TestCase):
         response = load_fixture(FIXTURE)
         script = build_script(select_items(response.items), run_date=date(2026, 8, 28))
         durations = {segment["id"]: 2.0 for segment in script["segments"]}
-        cues = [{"start": 0.0, "end": 1.0, "text": "这里是 AI 信号早报"}]
+        cues = [{"start": 0.0, "end": 1.0, "text": "各位观众早上好"}]
         with tempfile.TemporaryDirectory() as directory:
             result = materialize(Path(directory), script, durations, cues)
             html = (Path(directory) / "hyperframes" / "index.html").read_text(encoding="utf-8")
             self.assertNotIn("__SCENES__", html)
-            self.assertIn("AI 信号早报", html)
+            self.assertIn("AI每日早报", html)
+            self.assertIn("AI Daily News", html)
             self.assertIn("OpenAI 发布新一代推理模型", html)
-            self.assertEqual(result["scene_count"], 10)
+            self.assertNotIn("08:00 / DAILY", html)
+            self.assertNotIn("LIVE SIGNAL", html)
+            self.assertNotIn("source-pill", html)
+            self.assertNotIn("story-index", html)
+            self.assertNotIn("class=\"progress\"", html)
+            self.assertIn('id="nav-active-ai-models"', html)
+            self.assertIn('class="top-nav"', html)
+            self.assertIn("资讯概览", html)
+            self.assertIn("模型发布", html)
+            self.assertIn('class="point-grid count-', html)
+            self.assertNotIn("story-lede", html)
+            self.assertEqual(result["scene_count"], 11)
             project = json.loads((Path(directory) / "project.json").read_text(encoding="utf-8"))
             self.assertEqual(project["render_runtime"], "hyperframes")
-

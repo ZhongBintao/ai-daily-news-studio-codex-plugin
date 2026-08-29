@@ -1,0 +1,76 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from ai_morning_brief.media import write_subtitles
+
+
+class SubtitleTests(unittest.TestCase):
+    def test_canonical_text_wins_over_noisy_stt_and_respects_punctuation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            alignment_dir = root / "artifacts" / "alignments"
+            alignment_dir.mkdir(parents=True)
+            words = [
+                {"word": "这里是AI每日早报，", "start": 0.0, "end": 0.7},
+                {"word": "今天带来两条消息。", "start": 0.8, "end": 1.55},
+                {"word": "。Google推出新模型，", "start": 1.7, "end": 2.35},
+                {"word": "性能更强。", "start": 2.45, "end": 3.2},
+            ]
+            (alignment_dir / "story.json").write_text(json.dumps({"word_timestamps": words}, ensure_ascii=False), encoding="utf-8")
+            script = {"segments": [{"id": "story", "broadcast_text": "这里是AI每日早报，今天带来两条消息。Google推出新模型，性能更强。"}]}
+            _, cues = write_subtitles(root, script, {"story": 3.5}, aligned=True)
+            texts = [cue["text"] for cue in cues]
+            self.assertEqual("".join(texts), script["segments"][0]["broadcast_text"])
+            self.assertFalse(any(text[0] in "，。！？,!?" for text in texts if text))
+            self.assertFalse(any(all(char in "，。！？,!?；;：:" for char in text) for text in texts))
+            self.assertTrue(all(0.0 <= cue["start"] < cue["end"] <= 3.5 for cue in cues))
+            self.assertTrue(all(cues[index]["end"] <= cues[index + 1]["start"] for index in range(len(cues) - 1)))
+
+    def test_unaligned_text_is_split_into_readable_phrases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = {"segments": [{"id": "intro", "broadcast_text": "各位观众早上好，今天是8月28日，星期五，欢迎收看今天的AI早报。"}]}
+            _, cues = write_subtitles(root, script, {"intro": 4.0}, aligned=False)
+            self.assertGreaterEqual(len(cues), 2)
+            self.assertTrue(all(len(cue["text"]) <= 28 for cue in cues))
+            self.assertFalse(any(cue["text"].startswith(("，", "。", "！", "？")) for cue in cues))
+
+    def test_collapsed_alignment_keeps_the_authored_tail_and_complete_phrases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            alignment_dir = root / "artifacts" / "alignments"
+            alignment_dir.mkdir(parents=True)
+            words = [
+                {"word": "首", "start": 0.0, "end": 0.4},
+                {"word": "先", "start": 0.4, "end": 0.8},
+                {"word": "来", "start": 0.8, "end": 1.2},
+                {"word": "看", "start": 1.2, "end": 1.6},
+                {"word": "今", "start": 1.6, "end": 2.0},
+                {"word": "日", "start": 2.0, "end": 2.4},
+                # The provider collapses the remainder onto one timestamp.
+                {"word": "资", "start": 2.4, "end": 2.45},
+                {"word": "讯概览，请看屏幕上的主要内容。", "start": 2.4, "end": 2.45},
+            ]
+            (alignment_dir / "overview.json").write_text(json.dumps({"word_timestamps": words}, ensure_ascii=False), encoding="utf-8")
+            text = "首先来看今日资讯概览，请看屏幕上的主要内容。"
+            script = {"segments": [{"id": "overview", "broadcast_text": text}]}
+            _, cues = write_subtitles(root, script, {"overview": 4.0}, aligned=True)
+            self.assertEqual("".join(cue["text"] for cue in cues), text)
+            self.assertEqual(len(cues), 1)
+            self.assertFalse(any(cue["text"].lstrip().startswith(("，", "。")) for cue in cues))
+
+    def test_multi_segment_timeline_keeps_later_cues_and_authored_spacing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = {
+                "segments": [
+                    {"id": "intro", "broadcast_text": "欢迎收看。"},
+                    {"id": "story", "broadcast_text": "OpenAI 发布 2.0 版本。"},
+                ]
+            }
+            _, cues = write_subtitles(root, script, {"intro": 2.0, "story": 3.0}, aligned=False)
+            self.assertTrue(any(cue["start"] >= 2.0 for cue in cues))
+            self.assertEqual("".join(cue["text"] for cue in cues), "欢迎收看。OpenAI 发布 2.0 版本。")
+            self.assertTrue(all(cue["end"] <= 5.0 for cue in cues))

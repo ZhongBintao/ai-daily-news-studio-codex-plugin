@@ -201,7 +201,7 @@ def run_pipeline(
         current_stage = "materialize"
         rendered = materialize(run_dir, script, audio["durations"], audio["subtitle_cues"])
         current_stage = "render"
-        output_path = run_dir / "renders" / f"ai-signal-morning-brief-{run_date.isoformat()}.mp4"
+        output_path = run_dir / "renders" / f"ai-daily-news-{run_date.isoformat()}.mp4"
         render_report = render_hyperframes(run_dir, openmontage_root=openmontage_root, output_path=output_path)
         current_stage = "quality"
         probe = probe_video(output_path)
@@ -238,7 +238,7 @@ def run_pipeline(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build the daily AI 信号早报 from AIHOT and OpenMontage.")
+    parser = argparse.ArgumentParser(description="Build AI每日早报 from AIHOT and OpenMontage.")
     parser.add_argument("run", nargs="?", choices=["run"], default="run")
     parser.add_argument("--date", dest="run_date", help="edition date in YYYY-MM-DD; defaults to Asia/Shanghai today")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)

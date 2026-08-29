@@ -101,6 +101,8 @@ class ScriptSegment:
     layout_type: str
     aihot_url: str | None = None
     original_url: str | None = None
+    screen_groups: tuple[dict[str, Any], ...] = tuple()
+    minimum_duration_seconds: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -115,9 +117,10 @@ class ScriptSegment:
             "broadcast_text": self.broadcast_text,
             "source_fragments": list(self.source_fragments),
             "screen_points": list(self.screen_points),
+            "screen_groups": [dict(group) for group in self.screen_groups],
             "layout_type": self.layout_type,
+            "minimum_duration_seconds": self.minimum_duration_seconds,
             "aihot_url": self.aihot_url,
             "original_url": self.original_url,
             "delivery_cues": {"register": "factual", "energy": "clear", "pause_after_title": True},
         }
-

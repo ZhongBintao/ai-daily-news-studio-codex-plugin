@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections import OrderedDict
 from datetime import date
 from typing import Any, Iterable, Mapping
 
-from .config import DEFAULT_SHOW_NAME
+from .config import CATEGORY_LABELS, CATEGORY_ORDER, DEFAULT_SHOW_NAME, DEFAULT_SHOW_NAME_EN
 from .models import ScriptSegment, SelectionResult, SourceItem
 
 
@@ -12,6 +13,7 @@ _SENTENCE_RE = re.compile(r"[^。！？!?；;]+[。！？!?；;]?", re.UNICODE)
 _NUMBER_RE = re.compile(r"(?<![A-Za-z])\d+(?:[.,]\d+)?(?:\s?[万亿千万百十%％倍个名家月日年美元港元欧元元桶/日]+)?", re.UNICODE)
 _ASCII_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9.+#/-]*")
 _DATE_RE = re.compile(r"\b(?:19|20)\d{2}[-/.年]\d{1,2}(?:[-/.月]\d{1,2}日?)?\b")
+_WEEKDAY_NAMES = "一二三四五六日"
 
 
 def _clean(text: str) -> str:
@@ -73,7 +75,24 @@ def screen_points(item: SourceItem, fragments: Iterable[Mapping[str, str]]) -> t
                 clauses.append(clause)
     with_numbers = [clause for clause in clauses if _NUMBER_RE.search(clause) or _DATE_RE.search(clause)]
     ordered = with_numbers + [clause for clause in clauses if clause not in with_numbers]
-    return tuple(ordered[:3])
+    return tuple(ordered[:5])
+
+
+def _overview_groups(items: Iterable[SourceItem]) -> tuple[dict[str, Any], ...]:
+    grouped: "OrderedDict[str, list[dict[str, str]]]" = OrderedDict()
+    for item in items:
+        category = item.category or "other"
+        grouped.setdefault(category, []).append({"item_id": item.item_id, "title": _clean(item.title)})
+    ordered_categories = [category for category in CATEGORY_ORDER if category in grouped]
+    ordered_categories.extend(category for category in grouped if category not in ordered_categories)
+    return tuple(
+        {
+            "category": category,
+            "label": CATEGORY_LABELS.get(category, category),
+            "items": list(grouped[category]),
+        }
+        for category in ordered_categories
+    )
 
 
 def layout_for(item: SourceItem, broadcast: str) -> str:
@@ -116,31 +135,49 @@ def build_script(selection: SelectionResult, *, run_date: date, show_name: str =
         category="开场",
         source_item_id=None,
         source_name=None,
-        broadcast_text=f"这里是{show_name}，今天为你带来 {len(segments)} 条过去 24 小时的 AIHOT 精选。",
+        broadcast_text=(
+            f"各位观众早上好，今天是{run_date.month}月{run_date.day}日，"
+            f"星期{_WEEKDAY_NAMES[run_date.weekday()]}，欢迎收看今天的AI早报，下面是详细报道"
+        ),
         source_fragments=tuple(),
-        screen_points=(f"{len(segments)} 条精选", "过去 24 小时", "AIHOT"),
+        screen_points=tuple(),
         layout_type="intro",
+    )
+    overview = ScriptSegment(
+        segment_id="overview",
+        kind="overview",
+        title=f"{run_date.isoformat()} 资讯概览",
+        category="overview",
+        source_item_id=None,
+        source_name=None,
+        broadcast_text="首先来看今日资讯概览，请看屏幕上的主要内容。",
+        source_fragments=tuple(),
+        screen_points=tuple(),
+        layout_type="overview",
+        screen_groups=_overview_groups(selection.items),
+        minimum_duration_seconds=12.0,
     )
     outro = ScriptSegment(
         segment_id="outro",
         kind="outro",
-        title=f"{show_name} 完",
+        title="明天见",
         category="结尾",
         source_item_id=None,
         source_name=None,
-        broadcast_text=f"以上是{show_name}，信息来自 AIHOT 过去 24 小时精选。",
+        broadcast_text="今天的AI资讯播送完了，我们明天见",
         source_fragments=tuple(),
         screen_points=tuple(),
         layout_type="outro",
     )
-    ordered = [intro, *segments, outro]
+    ordered = [intro, overview, *segments, outro]
     return {
         "version": "1.0",
         "show_name": show_name,
+        "show_name_en": DEFAULT_SHOW_NAME_EN,
         "date": run_date.isoformat(),
         "mode": selection.mode,
         "title": f"{run_date.isoformat()} {show_name}",
-        "opening": {"duration_seconds": 4.0, "style": "editorial-reveal", "hero_segment_id": segments[0].segment_id if segments else None},
+        "opening": {"duration_seconds": 4.0, "style": "editorial-reveal", "hero_segment_id": overview.segment_id},
         "segments": [segment.to_dict() for segment in ordered],
         "source_item_ids": [item.item_id for item in selection.items],
         "category_counts": selection.category_counts,

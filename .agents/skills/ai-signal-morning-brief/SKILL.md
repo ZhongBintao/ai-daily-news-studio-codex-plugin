@@ -6,7 +6,7 @@ metadata:
   version: "0.1.0"
 ---
 
-# AI 信号早报
+# AI每日早报
 
 Use this skill for the daily 08:00 edition or an explicit local dry run.
 
@@ -15,7 +15,7 @@ Use this skill for the daily 08:00 edition or an explicit local dry run.
 1. Resolve the edition date in `Asia/Shanghai` and run only that date.
 2. Execute `python -m ai_morning_brief.pipeline run --date YYYY-MM-DD` from the project root.
 3. Keep the AIHOT source response, source URLs, factual script, fact ledger, subtitles, render report, and final MP4 under `outputs/YYYY-MM-DD/`.
-4. Report the final MP4 and `run_report.json` paths only after the quality report says `pass`.
+4. Report the final `ai-daily-news-YYYY-MM-DD.mp4` and `run_report.json` paths only after the quality report says `pass`.
 
 ## Source and editorial boundaries
 
@@ -30,4 +30,3 @@ Use this skill for the daily 08:00 edition or an explicit local dry run.
 - The run is local and private. Never print or write API keys, `.env` values, session files, cookies, or provider authorization headers.
 - A missing source response, Azure failure, render failure, or failed quality check is a failed run. Preserve diagnostics and never reuse a previous day's video as the current edition.
 - Same-date successful runs are idempotent unless the caller explicitly passes `--force`.
-
