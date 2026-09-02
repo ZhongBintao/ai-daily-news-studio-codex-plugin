@@ -3,7 +3,7 @@ name: ai-daily-news-studio-workflow
 description: Orchestrate one complete private AI每日早报 release package from AIHOT's selected 24-hour feed, including evidence-linked writing, source visuals, Azure speech, OpenMontage video, cover family, publication copy, and verification. Use as the primary plugin entrypoint; honor explicit requests for a smaller stage.
 metadata:
   author: local-project
-  version: "0.4.0"
+  version: "0.4.1"
 ---
 
 # AI Daily News Studio Workflow
@@ -47,15 +47,21 @@ reports, frozen `input_sha256`, provider manifest, cover manifest, release plan,
 and package manifest. Derive progress from these existing artifacts; do not add
 a parallel state database.
 
-- If a same-date package and every recorded hash still validate, report and reuse
-  it without external calls unless the user explicitly requests regeneration.
+- Reuse a same-date success only when its build-contract fingerprint matches the
+  current runtime/plugin contract, `quality_report.json` is `pass`, the final
+  MP4 exists, and its recorded hash still matches. A missing or mismatched
+  fingerprint automatically invalidates the dated success.
+- When a dated result is invalidated, preserve the frozen source snapshot and
+  approved editorial plan, and move the old MP4/report/package into the
+  recoverable `outputs/YYYY-MM-DD/archive/` area before rebuilding.
 - Reuse a frozen source only when its hash matches the editorial plan. Use
   `--reuse-source` for that path.
 - Use `--reuse-audio` only when the selected provider manifest and required audio
   stems are complete and match the edition. It is for remix/render work, not a
   provider switch.
-- Use `--force` only after the user explicitly asks to rebuild an already
-  successful date or replace an approved release artifact.
+- Use `--force` for an explicit rebuild or provider/audio replacement.
+  Contract mismatch already triggers the scoped rebuild automatically; it does
+  not refetch the frozen source when `--reuse-source` is appropriate.
 - Never reuse an older date's source, narration, video, cover, or package as a
   current edition.
 
@@ -89,10 +95,16 @@ Reuse one visible in-app-browser tab and inspect only frozen original URLs. Befo
 each URL, temporarily set the in-app browser viewport override to 1440×900;
 capture the resulting current viewport with `tab.screenshot({fullPage: false})`,
 then reset the override after the capture. X requests capture only the original
-post; web requests capture one expanded-viewport screenshot and optionally one
-related article image. Do not use fullPage, clip, scrolling, or stitching. Do
-not connect to Chrome, sign in, bypass gates, or copy browser state. A complete
-workflow must validate and select at least one original-source visual before TTS.
+post; web requests capture one expanded-viewport screenshot and up to two
+related article images when clearly relevant. Do not use fullPage, clip,
+scrolling, or stitching. Do not connect to Chrome, sign in, bypass gates, or
+copy browser state. The collector actively processes every requested
+accessible story and the renderer displays every claim-matched asset; X stays
+strictly one original-post asset. A complete workflow must validate and select
+at least one original-source visual before TTS. A current receipt must carry
+`capture_contract_id=iab-expanded-viewport-v1` and
+`capture_method=iab-expanded-viewport-screenshot`; old element-screenshot
+receipts are recapture-required, never silent skips.
 
 ### 3. Write and validate the editorial plan
 

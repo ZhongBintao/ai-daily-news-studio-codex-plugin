@@ -1,6 +1,6 @@
 {
   "name": "ai-daily-news-studio",
-  "version": "0.4.0+codex.20260901102043",
+  "version": "0.4.1+codex.20260902",
   "description": "Build a source-grounded private AI Daily News video, native full-cover GPT Image set, publication copy, and release package from AIHOT's selected 24-hour feed.",
   "author": {
     "name": "AI Daily News Studio"
