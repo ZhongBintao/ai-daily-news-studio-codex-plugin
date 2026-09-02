@@ -85,12 +85,14 @@ with old, remembered, or invented news.
 
 Read the frozen source-visual request list and use the Codex in-app browser
 only, following [the capture protocol](references/x-screenshot-capture.md).
-Reuse one visible in-app-browser tab and inspect only frozen original URLs. X
-requests capture only the original post; web requests capture one title-bearing
-first viewport and optionally one related article image. Do not scroll or stitch
-web pages. Do not connect to Chrome, sign in, bypass gates, or copy browser
-state. A complete workflow must validate and select at least one original-source
-visual before TTS.
+Reuse one visible in-app-browser tab and inspect only frozen original URLs. Before
+each URL, temporarily set the in-app browser viewport override to 1440×900;
+capture the resulting current viewport with `tab.screenshot({fullPage: false})`,
+then reset the override after the capture. X requests capture only the original
+post; web requests capture one expanded-viewport screenshot and optionally one
+related article image. Do not use fullPage, clip, scrolling, or stitching. Do
+not connect to Chrome, sign in, bypass gates, or copy browser state. A complete
+workflow must validate and select at least one original-source visual before TTS.
 
 ### 3. Write and validate the editorial plan
 
