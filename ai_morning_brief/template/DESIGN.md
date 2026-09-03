@@ -1,39 +1,45 @@
-# AI每日早报 · 参考图编辑版
+# AI每日早报 · v5 编辑型信息视频
 
-这是一套面向中文 AI 新闻的电视编辑部版式：暖米白纸张底色、全宽顶端栏目条、陶土橙主标题，以及带线性图标的白色圆角信息卡。概览负责让观众快速扫读当天标题，详情页负责逐条播报事实；画面不显示来源、链接、编号、进度条或 AIHOT 标识。
+暖米白纸张底、陶土橙标题、深青标签与白色圆角信息卡组成统一的中文电视
+编辑部语言。目标是让观众看懂完整新闻，不以固定时长或固定卡片数换取节奏。
 
-## Colors
+## Navigation
 
-- `#F7F4EE` — warm paper field
-- `#20282B` — ink and readable body text
-- `#CF704A` — terracotta headline and active navigation
-- `#E8AC3B` — amber emphasis
-- `#3F7376` — teal editorial label
-- `#B84A3E` — red data/product highlight
+- 全片只有一个 66px 顶部导航栏，内容是按 `presentation_order` 排列的具体
+  新闻标题。
+- 概览页显示但不激活；新闻页只高亮当前故事；开场和结尾隐藏。
+- 标签必须是“主体＋具体变化”，完整显示，不使用省略号。运行时按真实宽度从
+  22px 自适应到最低 16px；最低字号仍溢出时写稿门禁失败。
+- 不渲染底部章节栏、进度线、Intro/Outro 标签或类别导航。
 
-## Typography
+## Overview
 
-- All visible text: `Noto Sans SC`, with 400/500/700/900 weights.
-- Headlines: 900 weight, tight tracking, 67–138px depending on scene.
-- Card body and overview bullets: 500 weight, 24–25px.
-- Captions and navigation: 700 weight; captions start at 48px and fit down to 40px.
-- Use tabular numbers where numerical columns are added; do not mix Chinese font families.
+- 概览显示完整 `overview_text`，按类别使用两列、每页 2–4 个编辑卡片。
+- 分页依据两列网格中卡片的实际内容高度和可用高度；只要下一条仍能放入
+  当前页就继续排列，放不下时才换页，不再使用固定可见单位配额。
+- 每页固定停留 5 秒；分页仍保证完整显示，不因字数自动延长概览页。
+- 旁白只播一次简短提示；其余阅读时间由背景音乐和音频静音填充覆盖。
 
-## Layout
+## Story cards and captions
 
-- Navigation is a full-width 66px rectangular strip pinned to the top edge.
-- Overview uses a two-column editorial card grid with category accents.
-- Detail pages use a large centered headline and adaptive 1–5 card matrix: three cards on the first row and two centered on the second row when five points exist.
-- Captions sit in a single safe bottom zone and never clip or wrap mid-phrase.
+- 卡片数量由 claims 决定，不设上限。每页排 3–5 张；后续页依次切换，所有
+  标题和正文完整保留，不执行 `cards[:4]`，不缩小到不可读。
+- 编辑 beat 可包含完整多句解释；字幕在写稿后按标点和画面宽度拆分，单条不超过
+  28 个可见单位，并继承相同 beat/claim 语境。
+- 字幕位于画面底部安全区，48px 起步，最低 40px；所有可见文字使用
+  `Noto Sans SC`。
 
-## Motion and audio
+## Source visual layer
 
-Use a restrained editorial push between scenes, staggered card entrances, and a calm closing reveal. Every scene enters; the transition owns the handoff. The music bed is a CC0 external track, ducked beneath narration and allowed to breathe during the overview hold.
+- 新闻先显示资讯卡，随后由 claim-matched visual beat 触发一个直接叠加层。
+- 图片与静音视频共用 `source-visual-layer`，位于卡片和故事标题之上、顶部导航/字幕之下；
+  不隐藏卡片，不做 card-ID 逐帧交叉淡入。
+- 原始截图由 Codex 内置浏览器直接按主内容元素截取，不把视口外壳和正文栏外
+  空白带入画面。原始文件保留在 raw 目录，展示副本逐字节复制；模板允许紧凑
+  截图按最终舞台放大显示。图片持续覆盖 visual beat；短视频结束后停最后一帧。
 
-## What NOT to Do
+## Quality
 
-- Do not use Georgia, Noto Sans JP, JetBrains Mono, emoji icons, or per-glyph fallback fonts.
-- Do not show time badges, story counts, source pills, link hints, progress bars, or bottom rules.
-- Do not split protected product names, numbers, or the phrase “AI早报” across subtitle cues.
-- Do not use the old left/right split layout or cramped three-column detail cards.
-- Do not let the music disappear under narration or let captions begin with punctuation.
+门禁检查丰富概览完整性和阅读时长、单顶部导航、导航溢出、卡片分页、素材有效
+分辨率与 hash、素材/播音 claim 匹配，以及 HyperFrames 最终帧文本溢出。任何
+一项失败都不得报告 MP4 成功。

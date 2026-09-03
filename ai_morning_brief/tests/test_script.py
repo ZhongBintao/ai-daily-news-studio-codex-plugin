@@ -31,15 +31,19 @@ class ScriptTests(unittest.TestCase):
         self.assertEqual(kinds.count("news"), 8)
         self.assertEqual(
             self.script["segments"][0]["broadcast_text"],
-            "各位观众早上好，今天是8月28日，星期五，欢迎收看今天的AI早报，下面是详细报道",
+            "各位观众早上好，今天是8月28日。欢迎收看AI早报。",
         )
-        self.assertEqual(self.script["segments"][-1]["broadcast_text"], "今天的AI资讯播送完了，我们明天见")
+        self.assertEqual(self.script["segments"][-1]["broadcast_text"], "今天的AI资讯播送完毕。我们明天见。")
         overview = self.script["segments"][1]
-        self.assertEqual(overview["broadcast_text"], "首先来看今日资讯概览，请看屏幕上的主要内容。")
-        self.assertEqual(overview["minimum_duration_seconds"], 12.0)
+        self.assertEqual(overview["broadcast_text"], "首先来看今日资讯概览。")
+        self.assertEqual(overview["minimum_duration_seconds"], 10.0)
         self.assertEqual(sum(len(group["items"]) for group in overview["screen_groups"]), 8)
         self.assertNotIn("AIHOT", self.script["segments"][0]["broadcast_text"])
         self.assertNotIn("AIHOT", self.script["segments"][-1]["broadcast_text"])
+        news = [segment for segment in self.script["segments"] if segment["kind"] == "news"]
+        self.assertTrue(all(segment["progress_label"] for segment in news))
+        self.assertEqual(len({segment["progress_label"] for segment in news}), len(news))
+        self.assertTrue(all(segment["visual_plan"]["variant"] in {"hero", "split", "lead-and-stack", "quad", "masonry"} for segment in news))
 
     def test_tampered_fragment_is_rejected(self):
         items = {item.item_id: item for item in self.response.items}
@@ -47,3 +51,12 @@ class ScriptTests(unittest.TestCase):
         tampered["segments"][2]["source_fragments"] = [{"source_field": "summary", "source_text": "这是没有出处的数字 999。"}]
         errors = validate_script(tampered, items)
         self.assertTrue(errors)
+
+    def test_news_presentation_follows_category_navigation_order(self):
+        categories = [
+            segment["category"]
+            for segment in self.script["segments"]
+            if segment["kind"] == "news"
+        ]
+        order = {"ai-models": 0, "tip": 1, "ai-products": 2, "paper": 3, "industry": 4}
+        self.assertEqual([order.get(category, 99) for category in categories], sorted(order.get(category, 99) for category in categories))

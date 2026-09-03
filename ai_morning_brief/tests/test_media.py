@@ -1,12 +1,40 @@
 import json
+import math
+import struct
 import tempfile
 import unittest
+import wave
 from pathlib import Path
 
-from ai_morning_brief.media import write_subtitles
+from ai_morning_brief.media import make_audio_assets, mix_audio, write_subtitles
 
 
 class SubtitleTests(unittest.TestCase):
+    def test_authored_caption_units_are_not_split_at_commas(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            alignment_dir = root / "artifacts" / "alignments"
+            alignment_dir.mkdir(parents=True)
+            spoken = "数据集包含 四千八百八十八位说话人。地区分布不均。"
+            words = [
+                {"word": spoken[:10], "text_offset": 0, "word_length": 10, "start": 0.0, "end": 1.0},
+                {"word": spoken[10:], "text_offset": 10, "word_length": len(spoken) - 10, "start": 1.1, "end": 2.0},
+            ]
+            (alignment_dir / "story.json").write_text(json.dumps({"word_timestamps": words}, ensure_ascii=False), encoding="utf-8")
+            script = {"segments": [{
+                "id": "story",
+                "display_text": "数据集包含 4888 位说话人。地区分布不均。",
+                "spoken_text": spoken,
+                "caption_units": [
+                    {"display_text": "数据集包含 4888 位说话人。", "spoken_text": spoken[:18]},
+                    {"display_text": "地区分布不均。", "spoken_text": spoken[18:]},
+                ],
+            }]}
+            _, cues = write_subtitles(root, script, {"story": 2.5}, aligned=True)
+            self.assertEqual([cue["text"] for cue in cues], ["数据集包含 4888 位说话人。", "地区分布不均。"])
+            self.assertEqual(len(cues), 2)
+            self.assertTrue(all(len(cue["text"]) <= 28 for cue in cues))
+
     def test_canonical_text_wins_over_noisy_stt_and_respects_punctuation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -74,3 +102,37 @@ class SubtitleTests(unittest.TestCase):
             self.assertTrue(any(cue["start"] >= 2.0 for cue in cues))
             self.assertEqual("".join(cue["text"] for cue in cues), "欢迎收看。OpenAI 发布 2.0 版本。")
             self.assertTrue(all(cue["end"] <= 5.0 for cue in cues))
+
+    def test_publication_music_mix_writes_audited_three_section_stems(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def tone(path: Path, duration: float, frequency: float) -> None:
+                frames = []
+                for index in range(round(duration * 48000)):
+                    sample = round(5000 * math.sin(2 * math.pi * frequency * index / 48000))
+                    frames.append(struct.pack("<h", sample))
+                with wave.open(str(path), "wb") as audio:
+                    audio.setnchannels(1)
+                    audio.setsampwidth(2)
+                    audio.setframerate(48000)
+                    audio.writeframes(b"".join(frames))
+
+            narration = root / "narration.wav"
+            tone(narration, 4.0, 220.0)
+            music_dir = root / "music"
+            music_dir.mkdir()
+            music = {}
+            for name, frequency in (("opening", 330.0), ("middle", 440.0), ("ending", 550.0)):
+                path = music_dir / f"{name}.wav"
+                tone(path, 1.0, frequency)
+                music[name] = path
+
+            output = mix_audio(root, narration, music, section_boundaries={"intro_end": 1.0, "middle_start": 1.0, "ending_start": 2.5})
+            self.assertTrue(output.is_file())
+            report = json.loads((root / "artifacts" / "background-music.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["quality_gate"]["status"], "passed")
+            self.assertEqual(report["rules"]["duck_window_ms"], 20.0)
+            self.assertEqual(report["rules"]["duck_recovery_ms"], 300.0)
+            self.assertEqual(report["placements"]["ending"]["start_seconds"], 2.5)
+            self.assertEqual(report["peak_protection"]["newly_clipped_samples"], 0)
