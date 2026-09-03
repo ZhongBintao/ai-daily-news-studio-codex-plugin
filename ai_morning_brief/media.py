@@ -833,16 +833,19 @@ def write_subtitles(project_dir: Path, script: Mapping[str, Any], durations: Map
             continue
         speech_duration = float((spoken_durations or {}).get(segment_id, duration))
         speech_duration = max(0.05, min(duration, speech_duration))
+        words: list[Mapping[str, Any]] = []
+        if aligned:
+            if not alignment_path.is_file():
+                raise MediaError(f"subtitle alignment is required for {segment_id}: {alignment_path}")
+            data = json.loads(alignment_path.read_text(encoding="utf-8"))
+            words = list(data.get("word_timestamps") or [])
+            if not words:
+                raise MediaError(f"subtitle alignment has no word timestamps for {segment_id}: {alignment_path}")
         caption_units = segment.get("caption_units") or []
         if isinstance(caption_units, list) and caption_units:
-            words = []
-            if aligned and alignment_path.is_file():
-                data = json.loads(alignment_path.read_text(encoding="utf-8"))
-                words = list(data.get("word_timestamps") or [])
             cues.extend(_caption_unit_cues(caption_units, words, cursor, speech_duration))
-        elif aligned and alignment_path.is_file():
-            data = json.loads(alignment_path.read_text(encoding="utf-8"))
-            cues.extend(_phrase_cues(text, list(data.get("word_timestamps") or []), cursor, speech_duration))
+        elif aligned:
+            cues.extend(_phrase_cues(text, words, cursor, speech_duration))
         else:
             cues.extend(_phrase_cues(text, [], cursor, speech_duration))
         cursor += duration

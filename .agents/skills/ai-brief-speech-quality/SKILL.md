@@ -35,6 +35,20 @@ Before TTS, require `artifacts/editorial_quality_report.json=pass`. Authored
 caption units are complete short sentences and are timed as units; do not
 mechanically split them at commas or replace them with recognition output.
 
+## Subtitle alignment gate
+
+Every Azure production run, including `--reuse-audio`, must build subtitles
+from the existing `artifacts/alignments/{segment_id}.json` WordBoundary data
+when alignment is enabled. Missing or empty alignment files must stop the run;
+they must never trigger a silent proportional fallback. Keep the reviewed
+`display_text`/caption-unit text unchanged and use alignment data only for
+timestamps. `--no-align` is an explicit proportional fallback, while Gemini
+is always labelled `gemini-proportional`/approximate. Before accepting a run,
+check `checks.speech.subtitle_alignment` in `quality_report.json`: Azure
+should report `azure-word-boundary` (or an explicitly labelled compatibility
+mode), and `proportional_fallback_segments` must be empty unless the fallback
+was explicitly requested.
+
 Run the local tests before any provider call. The mix report must show a
 per-section voice/music pre-duck gap within ±0.5 LU, sidechain attack/release
 of 30/350 ms with no more than 4 dB attenuation, final loudness near −16 LUFS,

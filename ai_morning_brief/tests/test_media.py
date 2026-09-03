@@ -6,7 +6,7 @@ import unittest
 import wave
 from pathlib import Path
 
-from ai_morning_brief.media import make_audio_assets, mix_audio, write_subtitles
+from ai_morning_brief.media import MediaError, make_audio_assets, mix_audio, write_subtitles
 
 
 class SubtitleTests(unittest.TestCase):
@@ -34,6 +34,40 @@ class SubtitleTests(unittest.TestCase):
             self.assertEqual([cue["text"] for cue in cues], ["数据集包含 4888 位说话人。", "地区分布不均。"])
             self.assertEqual(len(cues), 2)
             self.assertTrue(all(len(cue["text"]) <= 28 for cue in cues))
+
+    def test_aligned_caption_units_follow_word_boundaries_not_text_proportions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            alignment_dir = root / "artifacts" / "alignments"
+            alignment_dir.mkdir(parents=True)
+            text = "甲。乙。"
+            words = [
+                {"word": "甲", "text_offset": 0, "word_length": 1, "start": 0.80, "end": 1.00},
+                {"word": "乙", "text_offset": 2, "word_length": 1, "start": 1.60, "end": 1.80},
+            ]
+            (alignment_dir / "story.json").write_text(json.dumps({"word_timestamps": words}, ensure_ascii=False), encoding="utf-8")
+            script = {"segments": [{
+                "id": "story",
+                "display_text": text,
+                "spoken_text": text,
+                "caption_units": [
+                    {"display_text": "甲。", "spoken_text": "甲。"},
+                    {"display_text": "乙。", "spoken_text": "乙。"},
+                ],
+            }]}
+
+            _, cues = write_subtitles(root, script, {"story": 3.0}, aligned=True, spoken_durations={"story": 2.0})
+
+            self.assertEqual([(cue["start"], cue["end"]) for cue in cues], [(0.8, 1.0), (1.6, 1.8)])
+            self.assertTrue(all(cue["end"] <= 2.0 for cue in cues))
+
+    def test_aligned_subtitles_fail_when_alignment_file_is_missing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = {"segments": [{"id": "story", "display_text": "甲。", "spoken_text": "甲。"}]}
+
+            with self.assertRaisesRegex(MediaError, "subtitle alignment is required"):
+                write_subtitles(root, script, {"story": 1.0}, aligned=True)
 
     def test_canonical_text_wins_over_noisy_stt_and_respects_punctuation(self):
         with tempfile.TemporaryDirectory() as directory:

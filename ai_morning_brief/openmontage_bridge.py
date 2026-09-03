@@ -129,6 +129,38 @@ def _music_boundaries(script: Mapping[str, Any], durations: Mapping[str, float])
     }
 
 
+def _subtitle_alignment_report(
+    entries: list[Mapping[str, Any]],
+    *,
+    provider: str,
+    aligned: bool,
+) -> dict[str, Any]:
+    """Describe the timing source actually used to build the subtitles."""
+
+    provider_name = str(provider or "").strip().lower()
+    segments: list[dict[str, Any]] = []
+    for entry in entries:
+        segment_id = str(entry.get("segment_id") or "")
+        if not aligned:
+            mode = "gemini-proportional" if provider_name == "gemini" else "proportional-fallback"
+        else:
+            mode = str(entry.get("alignment_provider") or "provider-word-timestamp")
+        segments.append({
+            "segment_id": segment_id,
+            "mode": mode,
+            "alignment_path": entry.get("alignment_path"),
+        })
+    modes = sorted({str(segment["mode"]) for segment in segments if segment.get("mode")})
+    return {
+        "requested": bool(aligned),
+        "mode": modes[0] if len(modes) == 1 else "mixed" if modes else "none",
+        "approximate": any(mode == "gemini-proportional" or mode == "proportional-fallback" for mode in modes),
+        "proportional_fallback_segments": [segment["segment_id"] for segment in segments if segment["mode"] == "proportional-fallback"],
+        "compatibility_segments": [segment["segment_id"] for segment in segments if segment["mode"] == "azure-stt-compat"],
+        "segments": segments,
+    }
+
+
 def _pad_audio(path: Path, target_duration: float) -> None:
     """Pad a short spoken segment with silence for overview reading time."""
 
@@ -276,6 +308,7 @@ def _synthesize_and_align_gemini(
     # Gemini has no provider-native word boundaries, so captions stay on the
     # authored display text and use the deterministic fallback in media.py.
     subtitle_path, cues = write_subtitles(project_dir, script, durations, aligned=False, spoken_durations=spoken_durations)
+    subtitle_alignment = _subtitle_alignment_report(manifest, provider="gemini", aligned=False)
     manifest_path = project_dir / "artifacts" / "google_audio_manifest.json"
     write_json(manifest_path, {
         "version": "1.0",
@@ -298,6 +331,7 @@ def _synthesize_and_align_gemini(
         "spoken_durations": {key: round(value, 3) for key, value in spoken_durations.items()},
         "subtitle_path": "assets/subtitles/subtitles.srt",
         "subtitle_cue_count": len(cues),
+        "subtitle_alignment": subtitle_alignment,
         "failure_policy": "stop on Gemini TTS failure; no automatic provider fallback",
         "native_word_boundary": False,
         "compatibility_fallback": "deterministic proportional subtitle timing",
@@ -313,6 +347,7 @@ def _synthesize_and_align_gemini(
         "music_boundaries": music_boundaries,
         "provider": "gemini",
         "alignment_provider": provider.alignment_provider,
+        "subtitle_alignment": subtitle_alignment,
     }
 
 
@@ -358,6 +393,10 @@ def reuse_synthesized_audio(
         audio_path = project_dir / "assets" / "audio" / f"narration-{segment_id}.wav"
         if entry is None or not audio_path.is_file() or audio_path.stat().st_size == 0:
             raise OpenMontageError(f"reusable audio is incomplete for {segment_id}")
+        if align and provider_name != "gemini":
+            alignment_path = project_dir / "artifacts" / "alignments" / f"{segment_id}.json"
+            if not alignment_path.is_file() or alignment_path.stat().st_size == 0:
+                raise OpenMontageError(f"reusable subtitle alignment is missing for {segment_id}: {alignment_path}")
         durations[segment_id] = media_duration(audio_path)
         spoken_durations[segment_id] = float(entry.get("spoken_duration_seconds") or durations[segment_id])
     segment_ids = [str(segment["id"]) for segment in script.get("segments", [])]
@@ -366,7 +405,13 @@ def reuse_synthesized_audio(
     audio_events = _audio_events(script, durations, audio_assets)
     music_boundaries = _music_boundaries(script, durations)
     final_mix = mix_audio(project_dir, narration, audio_assets, audio_events, music_boundaries)
-    subtitle_path, cues = write_subtitles(project_dir, script, durations, aligned=False, spoken_durations=spoken_durations)
+    subtitle_aligned = bool(align and provider_name != "gemini")
+    subtitle_path, cues = write_subtitles(project_dir, script, durations, aligned=subtitle_aligned, spoken_durations=spoken_durations)
+    subtitle_alignment = _subtitle_alignment_report(
+        [entry for entry in manifest_data.get("segments", []) if isinstance(entry, Mapping)],
+        provider=provider_name,
+        aligned=subtitle_aligned,
+    )
     return {
         "durations": durations,
         "final_mix": final_mix,
@@ -377,6 +422,7 @@ def reuse_synthesized_audio(
         "music_boundaries": music_boundaries,
         "provider": provider_name,
         "alignment_provider": alignment_provider,
+        "subtitle_alignment": subtitle_alignment,
     }
 
 
@@ -568,6 +614,7 @@ def synthesize_and_align(
     music_boundaries = _music_boundaries(script, durations)
     final_mix = mix_audio(project_dir, narration, audio_assets, audio_events, music_boundaries)
     subtitle_path, cues = write_subtitles(project_dir, script, durations, aligned=align, spoken_durations=spoken_durations)
+    subtitle_alignment = _subtitle_alignment_report(manifest, provider="azure", aligned=align)
     write_json(project_dir / "artifacts" / "azure_audio_manifest.json", {
         "version": "2.0",
         "provider": "azure",
@@ -593,13 +640,14 @@ def synthesize_and_align(
         "spoken_durations": {key: round(value, 3) for key, value in spoken_durations.items()},
         "subtitle_path": "assets/subtitles/subtitles.srt",
         "subtitle_cue_count": len(cues),
+        "subtitle_alignment": subtitle_alignment,
         "failure_policy": "stop on Azure failure; Gemini is benchmark-only until explicit approval",
         "native_word_boundary": any(bool(entry.get("native_word_boundary")) for entry in manifest),
         "compatibility_fallback": native_error if native_provider is None else None,
         "compatibility_segments": [entry["segment_id"] for entry in manifest if entry.get("alignment_provider") == "azure-stt-compat"],
         "no_secrets_in_artifacts": True,
     })
-    return {"durations": durations, "final_mix": final_mix, "subtitle_path": subtitle_path, "manifest": manifest, "subtitle_cues": cues, "music_boundaries": music_boundaries, "provider": "azure", "alignment_provider": "azure-word-boundary" if native_provider is not None else "azure-stt-compat"}
+    return {"durations": durations, "final_mix": final_mix, "subtitle_path": subtitle_path, "manifest": manifest, "subtitle_cues": cues, "music_boundaries": music_boundaries, "provider": "azure", "alignment_provider": "azure-word-boundary" if native_provider is not None else "azure-stt-compat", "subtitle_alignment": subtitle_alignment}
 
 
 def render_hyperframes(project_dir: Path, *, openmontage_root: Path, output_path: Path) -> dict[str, Any]:

@@ -56,9 +56,14 @@ a parallel state database.
   recoverable `outputs/YYYY-MM-DD/archive/` area before rebuilding.
 - Reuse a frozen source only when its hash matches the editorial plan. Use
   `--reuse-source` for that path.
-- Use `--reuse-audio` only when the selected provider manifest and required audio
-  stems are complete and match the edition. It is for remix/render work, not a
-  provider switch.
+- Use `--reuse-audio` only when the selected provider manifest, required audio
+  stems, and subtitle alignment files are complete and match the edition. It
+  is for remix/render work, not a provider switch. On Azure, the default
+  aligned path must read `artifacts/alignments/*.json` and use those native
+  WordBoundary timestamps to rebuild the authored subtitles; a missing or
+  empty alignment file is a hard failure. Never silently replace Azure timing
+  with proportional timing. Gemini is explicitly approximate proportional
+  timing, and `--no-align` is the only explicit proportional fallback.
 - Use `--force` for an explicit rebuild or provider/audio replacement.
   Contract mismatch already triggers the scoped rebuild automatically; it does
   not refetch the frozen source when `--reuse-source` is appropriate.
@@ -173,7 +178,9 @@ OpenMontage/.venv/bin/python -m ai_morning_brief.pipeline run \
 Only an explicit user request may select Gemini. Never fall back from Azure to
 Gemini automatically. Do not report the MP4 unless `run_report.json` is
 `success`, `artifacts/quality_report.json` is `pass`, overview/card/navigation/
-visual layout gates pass, and the source-visual acceptance minimum is met.
+visual layout gates pass, the subtitle alignment report records the actual
+timing mode with no unexpected Azure fallback, and the source-visual acceptance
+minimum is met.
 
 ### 5. Freeze release copy and cover choice
 

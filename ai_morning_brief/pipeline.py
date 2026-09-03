@@ -545,6 +545,12 @@ def run_pipeline(
                 align=align,
                 speech_provider=speech_provider,
             )
+        subtitle_alignment = audio.get("subtitle_alignment") or {}
+        if align and str(speech_provider).strip().lower() == "azure" and subtitle_alignment.get("proportional_fallback_segments"):
+            raise OpenMontageError(
+                "Azure subtitle alignment unexpectedly used proportional fallback for: "
+                + ", ".join(str(value) for value in subtitle_alignment["proportional_fallback_segments"])
+            )
         # Keep the 20-phrase A/B benchmark on the default Azure path. An
         # explicit Gemini production run already spends the provider budget on
         # the edition itself, so record a clear non-live status instead of
@@ -666,6 +672,8 @@ def run_pipeline(
                     "pronunciation_ledger": str(artifacts / "pronunciation_ledger.json"),
                     "manifest": str(audio.get("manifest_path") or (artifacts / "azure_audio_manifest.json")),
                     "alignment_provider": audio.get("alignment_provider"),
+                    "subtitle_alignment": subtitle_alignment,
+                    "subtitle_alignment_gate": {"status": "pass", "requested": bool(align)},
                     "gemini_benchmark_status": tts_benchmark.get("status"),
                     "tts_benchmark_execution": benchmark_execution,
                 },
