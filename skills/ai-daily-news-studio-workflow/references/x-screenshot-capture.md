@@ -3,6 +3,16 @@
 只处理当天冻结的原文 URL。自动模式固定使用 Codex 内置浏览器；不连接
 Chrome，不登录，不读取 Cookie、Local Storage、Profile、密码或授权头。
 
+## 自动化能力预检与终止规则
+
+打开第一条 URL 之前，当前任务必须同时具备：内置浏览器控制、直接项目文件写入、
+以及 1440×900 扩大视口截图能力。将检查结果写入
+`artifacts/source_visual_preflight.json`；三项任一不可用就把对应请求终止为
+`unavailable`，使用 `error_code=browser_capture_unavailable`，并返回
+`awaiting_screenshots`（最低截图要求大于 0 时）。禁止用 CUA 操作 Terminal、切换
+Chrome、base64/剪贴板中转、复制浏览器状态或再次尝试。每个冻结原文最多一次尝试。
+状态只能是 `pending → validated` 或 `pending → unavailable`。
+
 ## 捕获
 
 1. 复用一个可见的内置浏览器标签页，并在打开原文前通过 `viewport` 能力临时设置
@@ -22,7 +32,8 @@ Chrome，不登录，不读取 Cookie、Local Storage、Profile、密码或授�
    `capture_contract_id`、
    `device_scale_factor`、`crop_box`、`original_dimensions`、
    `evidence_text`、`capture_attempt`、来源 URL 和捕获方式；网站主内容还记录
-   `content_bounds`。
+   `content_bounds`。请求和结果清单还必须记录 `attempts`、`capture_executor`、
+   `terminal_state` 和 `error_code`。
 
 最小截图调用顺序固定为：
 
@@ -38,6 +49,7 @@ await viewport.reset();
   "complete": true,
   "asset_count": 1,
   "source_url": "https://example.com/post",
+  "capture_executor": "codex_in_app_browser",
   "capture_method": "iab-expanded-viewport-screenshot",
   "capture_contract_id": "iab-expanded-viewport-v1",
   "capture_scope": "original_post_only",
