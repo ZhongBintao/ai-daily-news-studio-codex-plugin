@@ -89,6 +89,15 @@ with old, remembered, or invented news.
 
 ### 2. Capture source visuals
 
+Before opening the first URL, perform a capability hard stop. The current task
+must expose all three capabilities: Codex in-app-browser control, direct project
+file writing, and a 1440×900 expanded-viewport screenshot. Record the check in
+`artifacts/source_visual_preflight.json` (the runtime also provides the
+`ai_morning_brief.screenshots preflight` command). If any capability is absent,
+mark the requests `unavailable` with `error_code=browser_capture_unavailable`,
+return `awaiting_screenshots`, and stop before the editorial script, TTS, or
+render stage. Do not try to make the missing capability work.
+
 Read the frozen source-visual request list and use the Codex in-app browser
 only, following [the capture protocol](references/x-screenshot-capture.md).
 Reuse one visible in-app-browser tab and inspect only frozen original URLs. Before
@@ -98,13 +107,23 @@ then reset the override after the capture. X requests capture only the original
 post; web requests capture one expanded-viewport screenshot and up to two
 related article images when clearly relevant. Do not use fullPage, clip,
 scrolling, or stitching. Do not connect to Chrome, sign in, bypass gates, or
-copy browser state. The collector actively processes every requested
-accessible story and the renderer displays every claim-matched asset; X stays
-strictly one original-post asset. A complete workflow must validate and select
-at least one original-source visual before TTS. A current receipt must carry
+copy browser state. Do not use CUA to operate a Terminal, use Chrome, transfer
+JPEG/PNG bytes through base64 or the clipboard, or retry with another executor.
+Each frozen original URL has at most one attempt. The collector actively
+processes every requested accessible story and the renderer displays every
+claim-matched asset; X stays strictly one original-post asset. A complete
+workflow must validate and select at least one original-source visual before
+TTS. A current receipt must carry
 `capture_contract_id=iab-expanded-viewport-v1` and
 `capture_method=iab-expanded-viewport-screenshot`; old element-screenshot
-receipts are recapture-required, never silent skips.
+receipts are unavailable, never silently accepted or retried.
+
+Each request follows only `pending → validated` or `pending → unavailable` and
+records `attempts`, `capture_executor`, `terminal_state`, and `error_code` in
+both source-visual manifests. Once `unavailable`, it is not reopened by a later
+automation invocation. Auto mode may continue with card-only output only when
+the configured minimum is zero; with minimum one, it ends as
+`awaiting_screenshots` before script/TTS/render.
 
 ### 3. Write and validate the editorial plan
 
@@ -187,6 +206,9 @@ required before any external publication.
 - Stop before TTS when the frozen source, editorial plan, pronunciation gate,
   or required original-source visual is incomplete. The stop is a machine
   failure result for automation, not an interactive continuation question.
+- A missing in-app-browser/file-write/1440×900 capability is
+  `browser_capture_unavailable`; it must never trigger Terminal CUA, base64
+  transfer, Chrome, or a second attempt for the same URL.
 - Stop before cover generation when the video quality gate fails.
 - Stop before package assembly when a requested cover file is missing or empty,
   or when the source hash, video hash, or publication-copy validation fails.
