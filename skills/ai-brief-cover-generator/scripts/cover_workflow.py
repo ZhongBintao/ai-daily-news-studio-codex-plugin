@@ -193,17 +193,41 @@ def rank_items(editorial: dict[str, Any]) -> list[dict[str, Any]]:
         numeric_anchors = len(NUMERIC_RE.findall(text))
         lowered = text.casefold()
         visual_anchors = sum(1 for term in ACTION_TERMS if term in lowered)
+        meta = item.get("selection_meta") if isinstance(item.get("selection_meta"), dict) else {}
+        if meta:
+            try:
+                relative_percentile = float(meta.get("rank_percentile") or 0)
+            except (TypeError, ValueError):
+                relative_percentile = 0.0
+            try:
+                relative_rank = int(meta.get("rank") or 999999)
+            except (TypeError, ValueError):
+                relative_rank = 999999
+            is_leader = 1 if relative_rank == 1 else 0
+            is_head = 1 if str(meta.get("tier") or "") == "head" else 0
+            # Leaders/head items are comparable across dimensions; raw scores
+            # are retained below for audit only and are not cross-compared.
+            sort_key = (is_leader, is_head, relative_percentile, -relative_rank, len(brands), numeric_anchors + visual_anchors, -index)
+        else:
+            # Historical editorial inputs have no relative-selection metadata.
+            # Preserve their old deterministic ranking for replay compatibility.
+            try:
+                impact = float(item.get("score") or 0)
+            except (TypeError, ValueError):
+                impact = 0.0
+            sort_key = (0, 0, impact, 0, len(brands), numeric_anchors + visual_anchors, -index)
         try:
-            impact = float(item.get("score") or 0)
+            raw_score = float(item.get("score")) if item.get("score") is not None else None
         except (TypeError, ValueError):
-            impact = 0.0
-        sort_key = (impact, len(brands), numeric_anchors + visual_anchors, -index)
+            raw_score = item.get("score")
         ranked.append({
             "item_id": str(item.get("id") or ""),
             "frozen_index": index,
             "title": str(item.get("title") or ""),
             "summary": str(item.get("summary") or ""),
-            "aihot_score": impact,
+            "aihot_score": raw_score,
+            "selection_meta": dict(meta),
+            "is_dimension_leader": bool(meta and str(meta.get("rank")) == "1"),
             "recognized_brands": [entry["name"] for entry in brands],
             "numeric_anchors": numeric_anchors,
             "visual_anchors": visual_anchors,

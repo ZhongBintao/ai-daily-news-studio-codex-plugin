@@ -1,4 +1,14 @@
-# AI每日早报 editorial plan v5
+# AI每日早报 editorial plan v5.1
+
+## Source selection metadata
+
+The runtime freezes four independent AIHOT requests with
+`mode=selected&window=24h&by=timeline` and categories `ai-models`,
+`ai-products`, `industry`, and `paper`. `window=24h` is rolling from request
+time. The candidate report preserves each item's raw `score`, both links,
+dimension-local `rank`, `rank_percentile`, `tier`, and decision reason. A score
+is never a cross-dimension threshold and missing scores remain eligible.
+Video cards and narration must not display these metadata fields.
 
 `editorial_input.json`（含冻结 source details）是唯一事实源。每条入选资讯恰好
 出现一次，所有显示文案和播音文案都可追溯到 exact claims。
@@ -36,9 +46,10 @@
 ```json
 {
   "version": "5.0",
-  "prompt_version": "codex-editorial-v5",
-  "writer": {"skill": "ai-brief-editorial-writer", "version": "4.0", "status": "approved"},
+  "prompt_version": "codex-editorial-v5.1",
+  "writer": {"skill": "ai-brief-editorial-writer", "version": "4.1", "status": "approved"},
   "stories": [{
+    "story_kind": "single",
     "subject": "明确主体",
     "navigation_title": "主体发布具体能力",
     "overview_text": "主体发布了什么，以及来源披露的具体结果",
@@ -52,5 +63,13 @@
   }]
 }
 ```
+
+For a short same-dimension `brief_group`, set `story_kind` to
+`brief_group`, provide 2–4 `source_item_ids`, `group_label`, and an
+`overview_items` entry for every item. Provide exactly one card per source
+item with `card.source_item_id`, and map every card from a corresponding beat
+through `beat.card_ids`. Use `cards_per_page=4`; do not attach source visuals.
+Keep dimension leaders and complex multi-claim stories as `single`. Groups of
+5–8 short items must be balanced as 3+2, 3+3, 4+3, or 4+4, with no singleton.
 
 Historical v2–v4 plans remain replayable. New production plans must use v5.

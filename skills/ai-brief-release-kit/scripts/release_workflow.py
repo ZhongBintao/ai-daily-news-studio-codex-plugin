@@ -254,8 +254,12 @@ def build_release_plan(args: argparse.Namespace) -> dict[str, Any]:
     plan_path = output_dir / "release_plan.json"
     if plan_path.exists() and not args.force:
         raise ReleaseKitError(f"release plan already exists; use --force to replace it: {plan_path}")
+    selection_policy = (editorial.get("selection") or {}).get("policy") or {}
+    selection_policy_sha256 = hashlib.sha256(
+        json.dumps(selection_policy, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     plan = {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "pass",
         "date": date,
         "input_sha256": input_sha256,
@@ -275,6 +279,19 @@ def build_release_plan(args: argparse.Namespace) -> dict[str, Any]:
             }
             for item in leads
         ],
+        "source_items": [
+            {
+                "item_id": str(item.get("id") or ""),
+                "title": str(item.get("title") or ""),
+                "category": item.get("category"),
+                "score": item.get("score"),
+                "selection_meta": item.get("selection_meta") or {},
+                "links": item.get("links") or {},
+            }
+            for item in selected_items(editorial)
+        ],
+        "selection_policy": selection_policy,
+        "selection_policy_sha256": selection_policy_sha256,
         "cover_story_item_id": leads[0]["item_id"],
         "cover_manifest_path": str(output_dir / "covers" / "cover_manifest.json"),
         "title_item_ids": title_item_ids,
@@ -346,6 +363,30 @@ def verify_image(path: Path) -> tuple[int, int]:
 def publish_copy_markdown(plan: dict[str, Any]) -> str:
     copy = plan["publish_copy"]
     date = plan["date"]
+    source_rows = []
+    for item in plan.get("source_items") or []:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").replace("|", "\\|")
+        category = str(item.get("category") or "未分类").replace("|", "\\|")
+        score = item.get("score")
+        score_text = "未提供" if score is None or score == "" else str(score)
+        links = item.get("links") or {}
+        aihot = str(links.get("aihot") or "")
+        original = str(links.get("original") or "")
+        aihot_link = f"[AIHOT]({aihot})" if aihot else "未提供"
+        original_link = f"[原文]({original})" if original else "未提供"
+        source_rows.append(f"| {title} | {category} | {score_text} | {aihot_link} | {original_link} |")
+    source_appendix = ""
+    if source_rows:
+        source_appendix = (
+            "\n## 本期来源与评分\n\n"
+            "评分为 AIHOT 原始字段，仅用于审计；本期选题采用维度内相对排名，不使用跨维度固定分数线。\n\n"
+            "| 资讯 | 维度 | AIHOT评分 | AIHOT站内链接 | 原文链接 |\n"
+            "|---|---|---:|---|---|\n"
+            + "\n".join(source_rows)
+            + "\n"
+        )
     return (
         f"# AI每日早报 {date}\n\n"
         "## 哔哩哔哩 / 抖音\n\n"
@@ -354,6 +395,7 @@ def publish_copy_markdown(plan: dict[str, Any]) -> str:
         "## 小红书\n\n"
         f"标题：{copy['xiaohongshu']['title']}\n\n"
         f"简介：{copy['xiaohongshu']['description']}\n"
+        + source_appendix
     )
 
 
@@ -487,6 +529,9 @@ def finalize_package(args: argparse.Namespace) -> dict[str, Any]:
             "cover_story_item_id": plan["cover_story_item_id"],
             "title_item_ids": plan["title_item_ids"],
             "publish_copy": plan["publish_copy"],
+            "source_items": plan.get("source_items", []),
+            "selection_policy": plan.get("selection_policy", {}),
+            "selection_policy_sha256": plan.get("selection_policy_sha256"),
             "files": records,
             "source_reports": {
                 "run_status": run_report.get("status"),

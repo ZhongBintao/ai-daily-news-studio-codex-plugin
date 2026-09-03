@@ -3,7 +3,7 @@ name: ai-brief-release-kit
 description: Prepare source-grounded AI每日早报 publication copy and assemble a private video release package that directly includes schema-5 first-result GPT Image covers. Use after video and cover generation; do not publish to platforms.
 metadata:
   author: local-project
-  version: "0.4.0"
+  version: "0.5.0"
 ---
 
 # AI每日早报发布整合包
@@ -17,6 +17,8 @@ TTS, video rendering, cover image generation, or platform publishing.
    cover ranking helper to choose the first and optional second story.
 2. Write `release_plan.json` with source-grounded platform copy, the canonical
    `cover_story_item_id`, and frozen `input_sha256`.
+   Also retain every selected item's dimension, raw AIHOT score (or
+   `未提供`), `links.aihot`, `links.original`, and the selection policy.
 3. Produce two title variants:
    - Bilibili/Douyin: one or two source-grounded clauses joined by `；`, at most
      55 Unicode characters.
@@ -42,7 +44,9 @@ TTS, video rendering, cover image generation, or platform publishing.
 7. Preserve read-only compatibility with historical schema 3 and 4 manifests;
    those older schemas continue to use their original approval, family,
    `normalized_file`, and Logo-receipt rules.
-8. Present publication copy, cover paths, final video, and the assembled package
+8. The generated `publish-copy.md` includes a source-and-score appendix for
+   audit/release readers. These fields remain outside the video cards.
+9. Present publication copy, cover paths, final video, and the assembled package
    path. Never upload or publish anything.
 
 ## Hard validation

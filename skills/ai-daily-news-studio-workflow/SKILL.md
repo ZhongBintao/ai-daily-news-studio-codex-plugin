@@ -3,7 +3,7 @@ name: ai-daily-news-studio-workflow
 description: Orchestrate one complete private AI每日早报 release package from AIHOT's selected 24-hour feed, including evidence-linked writing, source visuals, Azure speech, OpenMontage video, cover family, publication copy, and verification. Use as the primary plugin entrypoint; honor explicit requests for a smaller stage.
 metadata:
   author: local-project
-  version: "0.4.1"
+  version: "0.5.0"
 ---
 
 # AI Daily News Studio Workflow
@@ -79,7 +79,17 @@ OpenMontage/.venv/bin/python -m ai_morning_brief.pipeline prepare \
   --source-visual-min-stories 1
 ```
 
-Use AIHOT's selected 24-hour response only. Preserve its order and source links.
+Use only AIHOT's selected 24-hour pool. The runtime requests
+`mode=selected&window=24h&by=timeline` independently for `ai-models`,
+`ai-products`, `industry`, and `paper`, follows each opaque `page.nextCursor`,
+and never falls back to `mode=all`. `window=24h` is a rolling 24-hour window
+at request time; `by=timeline` follows AIHOT's collection timeline, including
+late-discovered slow-source items according to the official contract.
+Scores are ranked only inside each dimension. Do not apply a fixed score
+threshold across dimensions: the selector records raw score, dimension rank,
+rank percentile, both links, and the selection reason in `selection_report.json`.
+The selected output is normally 6–8 items, but fewer than three is a failed
+low-volume run and a dimension with no eligible item remains empty.
 The selected-feed API is a compact index, not a full article-body or media API.
 After the browser detail step, write a validated
 `artifacts/source_detail_snapshot.json` and let the next pipeline run merge it
@@ -129,9 +139,14 @@ the configured minimum is zero; with minimum one, it ends as
 
 Use [ai-brief-editorial-writer](../ai-brief-editorial-writer/SKILL.md) on the
 complete `editorial_input.json` and `writing_request.json`. Produce an approved,
-evidence-linked plan v5 and preserve the pronunciation ledger. Every story
-must include rich overview copy, complete beats, claim-driven card pages, and
-a concrete subject-change navigation label. The detailed
+evidence-linked plan v5 and preserve the pronunciation ledger. A dimension
+leader and a story requiring a complete explanation remain `single`; short,
+independent items in one dimension may become a `brief_group` of 2–4 items,
+with one card and one narration beat per item, one navigation slot, and no
+source visual. Groups of 5–8 must be balanced into 3+2, 3+3, 4+3, or 4+4;
+never leave a one-item orphan. Every story must include rich overview copy,
+complete beats, claim-driven card pages, and a concrete subject-change
+navigation label. The detailed
 source and card contract is in
 [editorial planning](references/editorial-planning.md).
 
