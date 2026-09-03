@@ -15,16 +15,15 @@ TTS, video rendering, cover image generation, or platform publishing.
 
 1. Read only `outputs/YYYY-MM-DD/artifacts/editorial_input.json` and use the
    cover ranking helper to choose the first and optional second story.
-2. Write `release_plan.json` with source-grounded platform copy, the canonical
-   `cover_story_item_id`, and frozen `input_sha256`.
+2. Write `release_plan.json` with one source-grounded publication copy, the
+   canonical `cover_story_item_id`, and frozen `input_sha256`.
    Also retain every selected item's dimension, raw AIHOT score (or
    `未提供`), `links.aihot`, `links.original`, and the selection policy.
-3. Produce two title variants:
-   - Bilibili/Douyin: one or two source-grounded clauses joined by `；`, at most
-     55 Unicode characters.
-   - Xiaohongshu: one concise clause about the first story, at most 20 Unicode
-     characters.
-   The description is exactly `AI每日早报YYYY-MM-DD`.
+3. Produce one unified copy:
+   - Title: exactly `AI每日早报YYYY-MM-DD`, using the frozen edition date.
+   - Article description: reuse the former Bilibili/Douyin title style and
+     information density, with one or two source-grounded clauses joined by
+     `；`. Do not split generation by platform or impose a character limit.
 4. Pass `cover_story_item_id` to `ai-brief-cover-generator`. Its headline,
    subheadline, and visual brief may be newly authored but must describe the
    same frozen first story.
@@ -51,14 +50,15 @@ TTS, video rendering, cover image generation, or platform publishing.
 
 ## Hard validation
 
+- The title must equal `AI每日早报YYYY-MM-DD` for the frozen edition date.
 - Numeric values, percentages, model names, and ASCII brand tokens in each
-  platform title must occur in its matching frozen source item.
-- The first title story, Xiaohongshu title, and cover story ID must agree.
+  article-description clause must occur in its matching frozen source item.
+- The first article-description story and `cover_story_item_id` must agree.
 - The video success and quality gates remain mandatory. Cover schema 5 removes
   only image-content and image-format validation; it does not weaken video or
   source-copy validation.
-- Do not truncate an entity, model name, number, or event to meet a title limit.
-  Drop the optional second clause instead.
+- Never truncate the article description or any source-grounded entity, model
+  name, number, or event.
 - The user-facing package contains only publication copy, first-result covers,
   the final MP4, and `package.json`. Prompts and audit artifacts remain outside.
 

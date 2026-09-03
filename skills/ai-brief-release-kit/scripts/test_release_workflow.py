@@ -20,8 +20,7 @@ SPEC.loader.exec_module(workflow)
 def args_for(**values):
     defaults = {
         "editorial_input": "",
-        "full_title": "",
-        "xiaohongshu_title": "",
+        "description": "",
         "primary_item_id": None,
         "secondary_item_id": None,
         "output_dir": None,
@@ -53,7 +52,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             ],
         }
 
-    def test_copy_selection_and_platform_limits(self) -> None:
+    def test_copy_selection_and_unified_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             editorial_path = root / "2026-08-31" / "artifacts" / "editorial_input.json"
@@ -62,13 +61,20 @@ class ReleaseWorkflowTests(unittest.TestCase):
             plan = workflow.build_release_plan(
                 args_for(
                     editorial_input=str(editorial_path),
-                    full_title="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR",
-                    xiaohongshu_title="索尼华纳起诉Anthropic",
+                    description="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR",
                 )
             )
             self.assertEqual(plan["cover_story_item_id"], "anthropic")
-            self.assertEqual(plan["title_item_ids"], ["anthropic", "uber"])
-            self.assertEqual(plan["publish_copy"]["xiaohongshu"]["description"], "AI每日早报2026-08-31")
+            self.assertEqual(plan["schema_version"], 3)
+            self.assertEqual(plan["description_item_ids"], ["anthropic", "uber"])
+            self.assertEqual(
+                plan["publish_copy"],
+                {
+                    "title": "AI每日早报2026-08-31",
+                    "description": "索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR",
+                },
+            )
+            self.assertNotIn("max_characters", plan["publish_copy"])
             self.assertEqual(plan["validation"]["status"], "pass")
 
     def test_numeric_leading_model_token_is_source_grounded(self) -> None:
@@ -90,13 +96,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
             plan = workflow.build_release_plan(
                 args_for(
                     editorial_input=str(editorial_path),
-                    full_title="索尼、华纳起诉Anthropic；Qwen3.8 27B 本地运行 17GB",
-                    xiaohongshu_title="Claude 自训缓解",
+                    description="索尼、华纳起诉Anthropic；Qwen3.8 27B 本地运行 17GB",
                 )
             )
             self.assertEqual(plan["validation"]["status"], "pass")
 
-    def test_second_clause_falls_back_to_one_when_copy_has_no_matching_source(self) -> None:
+    def test_description_with_no_matching_source_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             editorial_path = root / "2026-08-31" / "artifacts" / "editorial_input.json"
@@ -106,12 +111,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 workflow.build_release_plan(
                     args_for(
                         editorial_input=str(editorial_path),
-                        full_title="索尼、华纳起诉Anthropic；不存在的公司发布7个新模型",
-                        xiaohongshu_title="索尼华纳起诉Anthropic",
+                        description="索尼、华纳起诉Anthropic；不存在的公司发布7个新模型",
                     )
                 )
 
-    def test_long_two_clause_title_drops_only_the_optional_second_clause(self) -> None:
+    def test_long_description_is_preserved_without_length_limit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             editorial_path = root / "2026-08-31" / "artifacts" / "editorial_input.json"
@@ -120,13 +124,15 @@ class ReleaseWorkflowTests(unittest.TestCase):
             plan = workflow.build_release_plan(
                 args_for(
                     editorial_input=str(editorial_path),
-                    full_title="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR并且这是一段不必要的超长补充文字内容",
-                    xiaohongshu_title="索尼华纳起诉Anthropic",
+                    description="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR并且这是一段不必要的超长补充文字内容",
                 )
             )
-            self.assertEqual(plan["publish_copy"]["bilibili_douyin"]["title"], "索尼、华纳起诉Anthropic")
-            self.assertTrue(plan["validation"]["second_story_dropped_for_length"])
-            self.assertEqual(plan["title_item_ids"], ["anthropic"])
+            self.assertEqual(
+                plan["publish_copy"]["description"],
+                "索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR并且这是一段不必要的超长补充文字内容",
+            )
+            self.assertNotIn("second_story_dropped_for_length", plan["validation"])
+            self.assertEqual(plan["description_item_ids"], ["anthropic", "uber"])
 
     def test_finalize_builds_verified_user_package(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -138,8 +144,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             plan = workflow.build_release_plan(
                 args_for(
                     editorial_input=str(editorial_path),
-                    full_title="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR",
-                    xiaohongshu_title="索尼华纳起诉Anthropic",
+                    description="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR",
                 )
             )
             plan_path = run_dir / "release-kit" / "release_plan.json"
@@ -187,6 +192,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
             ))
             package_dir = Path(result["package_dir"])
             self.assertTrue((package_dir / "publish-copy.md").is_file())
+            publish_copy_text = (package_dir / "publish-copy.md").read_text(encoding="utf-8")
+            self.assertIn("标题：AI每日早报2026-08-31", publish_copy_text)
+            self.assertIn("文章简介：索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR", publish_copy_text)
+            self.assertNotIn("哔哩哔哩", publish_copy_text)
+            self.assertNotIn("小红书", publish_copy_text)
             self.assertTrue((package_dir / "covers" / "16x9.png").is_file())
             self.assertTrue((package_dir / "videos" / video.name).is_file())
             package = json.loads((package_dir / "package.json").read_text(encoding="utf-8"))
@@ -211,8 +221,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             plan = workflow.build_release_plan(
                 args_for(
                     editorial_input=str(editorial_path),
-                    full_title="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR",
-                    xiaohongshu_title="索尼华纳起诉Anthropic",
+                    description="索尼、华纳起诉Anthropic；Uber用AI Agent接管70%代码PR",
                 )
             )
             plan_path = run_dir / "release-kit" / "release_plan.json"
@@ -285,8 +294,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             )
             plan = workflow.build_release_plan(args_for(
                 editorial_input=str(editorial_path),
-                full_title="索尼、华纳起诉Anthropic",
-                xiaohongshu_title="索尼华纳起诉Anthropic",
+                description="索尼、华纳起诉Anthropic",
             ))
             plan_path = run_dir / "release-kit" / "release_plan.json"
             (run_dir / "run_report.json").write_text(
@@ -368,8 +376,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 "date": "2026-08-31",
                 "input_sha256": "old-frozen-input",
                 "cover_story_item_id": "anthropic",
-                "title_item_ids": ["anthropic"],
-                "publish_copy": {"bilibili_douyin": {"title": "冻结"}},
+                "description_item_ids": ["anthropic"],
+                "publish_copy": {"title": "AI每日早报2026-08-31", "description": "冻结"},
                 "files": [
                     workflow.file_record(publish_copy, package_dir, "text/markdown"),
                     workflow.file_record(cover, package_dir, "image/png", [1920, 1080]),

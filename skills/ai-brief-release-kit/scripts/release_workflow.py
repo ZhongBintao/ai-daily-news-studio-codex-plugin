@@ -27,8 +27,6 @@ ASCII_TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9])(?=[A-Za-z0-9._-]*[A-Za-z])[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?![A-Za-z0-9])"
 )
 NUMBER_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?%?")
-FULL_TITLE_LIMIT = 55
-XIAOHONGSHU_TITLE_LIMIT = 20
 
 
 class ReleaseKitError(ValueError):
@@ -143,71 +141,37 @@ def missing_source_tokens(copy_text: str, item: dict[str, Any]) -> list[str]:
     return sorted(set(missing), key=lambda value: (value.casefold(), value))
 
 
-def validate_platform_copy(
-    full_title: str,
-    xiaohongshu_title: str,
-    description: str,
+def validate_publication_copy(
+    article_description: str,
     lead_items: list[dict[str, Any]],
     date: str,
 ) -> dict[str, Any]:
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
         raise ReleaseKitError("editorial input has no valid YYYY-MM-DD date")
-    expected_description = f"AI每日早报{date}"
-    if description != expected_description:
-        raise ReleaseKitError(f"description must be exactly {expected_description}")
-    full_title = full_title.strip()
-    xiaohongshu_title = xiaohongshu_title.strip()
-    if not full_title or not xiaohongshu_title:
-        raise ReleaseKitError("publication titles must be non-empty")
-    if len(full_title) > FULL_TITLE_LIMIT:
-        raise ReleaseKitError(f"Bilibili/Douyin title exceeds {FULL_TITLE_LIMIT} characters")
-    if len(xiaohongshu_title) > XIAOHONGSHU_TITLE_LIMIT:
-        raise ReleaseKitError(f"Xiaohongshu title exceeds {XIAOHONGSHU_TITLE_LIMIT} characters")
-    if "\n" in full_title or "\r" in full_title or "\n" in xiaohongshu_title or "\r" in xiaohongshu_title:
-        raise ReleaseKitError("publication titles must be single-line")
-    if ";" in full_title:
+    article_description = article_description.strip()
+    if not article_description:
+        raise ReleaseKitError("article description must be non-empty")
+    if "\n" in article_description or "\r" in article_description:
+        raise ReleaseKitError("article description must be single-line")
+    if ";" in article_description:
         raise ReleaseKitError("use the full-width semicolon separator `；`")
-    clauses = [part.strip() for part in full_title.split("；")]
+    clauses = [part.strip() for part in article_description.split("；")]
     if len(clauses) not in (1, 2) or any(not part for part in clauses):
-        raise ReleaseKitError("full title must contain one or two non-empty clauses")
+        raise ReleaseKitError("article description must contain one or two non-empty clauses")
     if len(clauses) > len(lead_items):
-        raise ReleaseKitError("full title has more clauses than recorded lead items")
+        raise ReleaseKitError("article description has more clauses than recorded lead items")
     clause_checks = []
     for clause, item in zip(clauses, lead_items):
         missing = missing_source_tokens(clause, find_source_item_from_ranked(item))
         if missing:
             raise ReleaseKitError(
-                f"title clause contains unsupported tokens for {item['item_id']}: {', '.join(missing)}"
+                f"article description contains unsupported tokens for {item['item_id']}: {', '.join(missing)}"
             )
         clause_checks.append({"item_id": item["item_id"], "text": clause, "status": "pass", "missing_tokens": []})
-    xhs_missing = missing_source_tokens(xiaohongshu_title, find_source_item_from_ranked(lead_items[0]))
-    if xhs_missing:
-        raise ReleaseKitError(
-            "Xiaohongshu title contains unsupported tokens: " + ", ".join(xhs_missing)
-        )
     return {
         "status": "pass",
-        "full_title_length": len(full_title),
-        "xiaohongshu_title_length": len(xiaohongshu_title),
-        "description_exact": True,
-        "clauses": clause_checks,
-        "xiaohongshu": {
-            "item_id": lead_items[0]["item_id"],
-            "status": "pass",
-            "missing_tokens": [],
-        },
+        "description_clauses": clause_checks,
     }
-
-
-def fit_full_title(full_title: str) -> tuple[str, bool]:
-    """Drop only an optional second clause when the combined title is too long."""
-    candidate = full_title.strip()
-    if len(candidate) <= FULL_TITLE_LIMIT:
-        return candidate, False
-    clauses = [part.strip() for part in candidate.split("；")]
-    if len(clauses) == 2 and clauses[0] and len(clauses[0]) <= FULL_TITLE_LIMIT:
-        return clauses[0], True
-    return candidate, False
 
 
 def find_source_item_from_ranked(ranked_item: dict[str, Any]) -> dict[str, Any]:
@@ -235,17 +199,15 @@ def build_release_plan(args: argparse.Namespace) -> dict[str, Any]:
         raise ReleaseKitError("editorial input is missing input_sha256")
     leads = choose_leads(editorial, args.primary_item_id, args.secondary_item_id)
     source_by_id = {str(item["id"]): item for item in selected_items(editorial)}
-    description = f"AI每日早报{date}"
-    full_title, second_story_dropped = fit_full_title(args.full_title)
-    validation = validate_platform_copy(
-        full_title,
-        args.xiaohongshu_title,
-        description,
+    title = f"AI每日早报{date}"
+    article_description = args.description.strip()
+    validation = validate_publication_copy(
+        article_description,
         leads,
         date,
     )
-    clauses = [part.strip() for part in full_title.split("；")]
-    title_item_ids = [item["item_id"] for item in leads[: len(clauses)]]
+    clauses = [part.strip() for part in article_description.split("；")]
+    description_item_ids = [item["item_id"] for item in leads[: len(clauses)]]
     output_dir = (
         Path(args.output_dir).resolve()
         if args.output_dir
@@ -259,7 +221,7 @@ def build_release_plan(args: argparse.Namespace) -> dict[str, Any]:
         json.dumps(selection_policy, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
     plan = {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "pass",
         "date": date,
         "input_sha256": input_sha256,
@@ -294,16 +256,12 @@ def build_release_plan(args: argparse.Namespace) -> dict[str, Any]:
         "selection_policy_sha256": selection_policy_sha256,
         "cover_story_item_id": leads[0]["item_id"],
         "cover_manifest_path": str(output_dir / "covers" / "cover_manifest.json"),
-        "title_item_ids": title_item_ids,
+        "description_item_ids": description_item_ids,
         "publish_copy": {
-            "bilibili_douyin": {"title": full_title, "description": description, "max_characters": FULL_TITLE_LIMIT},
-            "xiaohongshu": {
-                "title": args.xiaohongshu_title.strip(),
-                "description": description,
-                "max_characters": XIAOHONGSHU_TITLE_LIMIT,
-            },
+            "title": title,
+            "description": article_description,
         },
-        "validation": {**validation, "second_story_dropped_for_length": second_story_dropped},
+        "validation": validation,
         "pipeline_integrity": {
             "main_pipeline_modified": False,
             "publishing_performed": False,
@@ -389,12 +347,8 @@ def publish_copy_markdown(plan: dict[str, Any]) -> str:
         )
     return (
         f"# AI每日早报 {date}\n\n"
-        "## 哔哩哔哩 / 抖音\n\n"
-        f"标题：{copy['bilibili_douyin']['title']}\n\n"
-        f"简介：{copy['bilibili_douyin']['description']}\n\n"
-        "## 小红书\n\n"
-        f"标题：{copy['xiaohongshu']['title']}\n\n"
-        f"简介：{copy['xiaohongshu']['description']}\n"
+        f"标题：{copy['title']}\n\n"
+        f"文章简介：{copy['description']}\n"
         + source_appendix
     )
 
@@ -486,7 +440,7 @@ def finalize_package(args: argparse.Namespace) -> dict[str, Any]:
                 and existing_manifest.get("input_sha256") == plan.get("input_sha256")
                 and existing_manifest.get("date") == plan.get("date")
                 and existing_manifest.get("cover_story_item_id") == plan.get("cover_story_item_id")
-                and existing_manifest.get("title_item_ids") == plan.get("title_item_ids")
+                and existing_manifest.get("description_item_ids") == plan.get("description_item_ids")
                 and existing_manifest.get("publish_copy") == plan.get("publish_copy")
                 and (existing_manifest.get("source_reports") or {}).get("cover_manifest_sha256") == cover_manifest_sha256
                 and (existing_manifest.get("source_reports") or {}).get("video_sha256") == video_sha256
@@ -527,7 +481,7 @@ def finalize_package(args: argparse.Namespace) -> dict[str, Any]:
             "date": plan["date"],
             "input_sha256": plan["input_sha256"],
             "cover_story_item_id": plan["cover_story_item_id"],
-            "title_item_ids": plan["title_item_ids"],
+            "description_item_ids": plan["description_item_ids"],
             "publish_copy": plan["publish_copy"],
             "source_items": plan.get("source_items", []),
             "selection_policy": plan.get("selection_policy", {}),
@@ -697,8 +651,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     prepare = subparsers.add_parser("prepare", help="freeze source-grounded publication copy")
     prepare.add_argument("--editorial-input", required=True)
-    prepare.add_argument("--full-title", required=True)
-    prepare.add_argument("--xiaohongshu-title", required=True)
+    prepare.add_argument("--description", required=True, help="source-grounded article description")
     prepare.add_argument("--primary-item-id")
     prepare.add_argument("--secondary-item-id")
     prepare.add_argument("--output-dir")

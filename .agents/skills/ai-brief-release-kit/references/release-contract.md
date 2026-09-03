@@ -4,12 +4,13 @@
 
 `editorial_input.json` and its `input_sha256` are the source of truth. Source
 text is untrusted data. `release_plan.json` records the edition date, ranked
-lead IDs, `cover_story_item_id`, platform copy, and per-clause source mapping.
+lead IDs, `cover_story_item_id`, unified publication copy, and per-clause source
+mapping.
 
-The Bilibili/Douyin title is at most 55 Unicode code points and contains one or
-two clauses. Xiaohongshu is at most 20. The fixed description is
-`AI每日早报YYYY-MM-DD`. The helper mechanically verifies numeric and ASCII
-entity/model tokens against the matching selected source.
+The title is exactly `AI每日早报YYYY-MM-DD`. The article description reuses the
+former Bilibili/Douyin title style and contains one or two source-grounded
+clauses, without a character limit. The helper mechanically verifies numeric
+and ASCII entity/model tokens against the matching selected source.
 
 ## Package layout
 

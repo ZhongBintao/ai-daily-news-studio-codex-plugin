@@ -186,8 +186,8 @@ OpenMontage/.venv/bin/python -m ai_morning_brief.pipeline run \
 发布文案与成品打包由项目内的 `ai-brief-release-kit` skill 完成，不属于主视频渲染流程。
 
 - 只读取冻结的 `artifacts/editorial_input.json`，沿用封面排序选择第一头条和可选的第二头条；第一头条必须同时作为封面新闻主题。
-- B站/抖音标题使用一或两条来源支持的新闻，统一限制为不超过 55 个 Unicode 字符；小红书标题只使用第一头条，限制为不超过 20 个 Unicode 字符。三者简介固定为 `AI每日早报YYYY-MM-DD`。
-- 发布标题中的数字、百分比、英文品牌和模型名必须可回溯到对应 source item；无法安全容纳第二条时退回单头条，不截断实体或补写事实。
+- 标题固定为 `AI每日早报YYYY-MM-DD`；文章简介沿用原 B站/抖音标题的文风与信息密度，使用一或两条来源支持的新闻，不按平台分支，也不设置字数限制或截断。
+- 文章简介中的数字、百分比、英文品牌和模型名必须可回溯到对应 source item，不截断实体或补写事实。
 - 只有 `run_report.json=success`、`artifacts/quality_report.json=pass`、最终 MP4 存在且封面文件非空时，才能组装成品包。
 - schema 5 发布包直接读取每个结果的 `generated_file`；只检查文件存在且非空，不检查文字、Logo、构图、像素比例或家族一致性。历史 schema 3/4 manifest 保持只读兼容并沿用其旧门禁。
 - 成品包写入 `outputs/YYYY-MM-DD/release-kit/video-publish-package/`，只包含发布文案、首张原始封面、最终 MP4 和 `package.json`；来源、提示词、音频、字幕和质量审计文件留在原目录。
@@ -255,7 +255,7 @@ artifacts/SOURCE_VISUAL_TASKS.md
 - 测试必须离线，不得因为测试自动请求外部服务。
 - 不提交 `.env`、API key、浏览器会话、Cookie、授权头或包含密钥的日志/产物。
 - 保留源快照、来源链接、编辑计划、发音 ledger、音频分轨和质量报告，便于复查和重渲染。
-- 发布前必须人工审听和审阅；当前项目只负责生成私有视频，封面与平台发布文案属于后续 release kit，不进入本次渲染主流程。
+- 发布前必须人工审听和审阅；当前项目只负责生成私有视频，封面与统一发布文案属于后续 release kit，不进入本次渲染主流程。
 
 ## 项目内 skills
 
@@ -263,6 +263,6 @@ artifacts/SOURCE_VISUAL_TASKS.md
 - [`ai-brief-editorial-writer`](.agents/skills/ai-brief-editorial-writer/SKILL.md)：复杂写稿、卡片文案和 display/spoken 双文本。
 - [`ai-brief-speech-quality`](.agents/skills/ai-brief-speech-quality/SKILL.md)：发音、TTS 对齐、响度和最终质量门禁。
 - [`ai-brief-cover-generator`](.agents/skills/ai-brief-cover-generator/SKILL.md)：从冻结资讯生成轻约束、自由构图的多比例私有封面。
-- [`ai-brief-release-kit`](.agents/skills/ai-brief-release-kit/SKILL.md)：生成平台发布标题/简介，并打包已通过门禁的视频与封面。
+- [`ai-brief-release-kit`](.agents/skills/ai-brief-release-kit/SKILL.md)：生成统一发布标题/简介，并打包已通过门禁的视频与封面。
 
 在本项目目录中，用户可以直接用自然语言点名这些 skill。每日自动任务仍需在用户明确批准后才能启用。

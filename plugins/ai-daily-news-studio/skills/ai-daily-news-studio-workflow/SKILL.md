@@ -185,8 +185,9 @@ minimum is met.
 ### 5. Freeze release copy and cover choice
 
 Use [ai-brief-release-kit](../ai-brief-release-kit/SKILL.md) to rank the frozen
-items and prepare `release_plan.json`. The first title story,
-`cover_story_item_id`, Xiaohongshu title, and cover topic must agree.
+items and prepare `release_plan.json`. The title is fixed from the edition date;
+the first article-description story, `cover_story_item_id`, and cover topic must
+agree.
 
 For a complete unattended run, default to all three standard ratios:
 `16:9`, `3:4`, and `9:16`. If the user explicitly supplies a different ratio
@@ -219,7 +220,7 @@ the schema-5 first-result covers, the final MP4, and `package.json`. For schema
 5, package assembly checks only that each generated cover exists and is
 non-empty; all video and source-copy gates remain unchanged.
 
-Report the platform titles, fixed description, generated cover paths, video path,
+Report the unified title, article description, generated cover paths, video path,
 and package path. Remind the user that human listening and visual review are
 required before any external publication.
 
