@@ -73,6 +73,13 @@ only `pending → validated` or `pending → unavailable`, with
 `attempts/capture_executor/terminal_state/error_code` persisted in both
 manifests.
 
+The direct-file-write capability is provided by the isolated
+`scripts/browser_screenshot_capture.mjs` helper documented in
+`references/x-screenshot-capture.md`. It writes the raw `Uint8Array` and
+receipt in the same Node REPL session, validates workspace roots, rejects
+symlink escapes, and refuses to overwrite. It does not replace or monkey-patch
+the browser plugin's existing `tab.screenshot()` API.
+
 - `auto` uses the Codex in-app browser only. It never connects to Chrome,
   reads cookies, signs in, or copies browser state. Public X posts are useful
   even without comments; login walls, CAPTCHA, permission and security gates

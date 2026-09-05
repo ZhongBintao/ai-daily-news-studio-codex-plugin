@@ -44,6 +44,59 @@ const raw = await tab.screenshot({fullPage: false});
 await viewport.reset();
 ```
 
+`tab.screenshot()` 的返回值必须在同一个 Codex Node REPL 会话中直接写入工作区，不能经过
+Terminal、Chrome、base64 或剪贴板。插件随附的
+`scripts/browser_screenshot_capture.mjs` 是隔离的落盘 helper；它不修改既有的
+`tab.screenshot()`，只接受原始 `Uint8Array`，校验 PNG/JPEG、计算 SHA-256，并在声明的
+`workspaceRoots` 内用拒绝覆盖的原子方式写入图片和 `capture.json`。
+
+调用时必须传入任务工作区的绝对路径；不要使用未解析的 `~`、相对路径或工作区外路径：
+
+```js
+const captureFile = await import("/ABSOLUTE/PATH/TO/skills/ai-daily-news-studio-workflow/scripts/browser_screenshot_capture.mjs");
+const check = await captureFile.preflightWorkspace({
+  outputDirectory: "/ABSOLUTE/WORKSPACE/outputs/YYYY-MM-DD/source-visuals/raw/ITEM_ID",
+  workspaceRoots: ["/ABSOLUTE/WORKSPACE"],
+  fileNameStem: "viewport",
+  extension: "jpg",
+});
+if (check.status !== "available") throw new Error(`${check.errorCode}: ${check.error}`);
+
+// 复用上一步刚捕获的 raw；不要再次调用 tab.screenshot()。
+const frozenOriginalUrl = request.original_url;
+const saved = await captureFile.saveBrowserScreenshot({
+  raw,
+  outputDirectory: "/ABSOLUTE/WORKSPACE/outputs/YYYY-MM-DD/source-visuals/raw/ITEM_ID",
+  workspaceRoots: ["/ABSOLUTE/WORKSPACE"],
+  fileNameStem: "viewport",
+  capturedUrl: await tab.url(),
+  viewport: {x: 0, y: 0, width: 1440, height: 900},
+  viewportOverride: {x: 0, y: 0, width: 1440, height: 900},
+  deviceScaleFactor: 2,
+  cropBox: {x: 0, y: 0, width: 1440, height: 900},
+  evidenceText: "截图中可见并与新闻 claim 对应的原文",
+});
+await captureFile.writeCaptureReceipt({
+  outputDirectory: "/ABSOLUTE/WORKSPACE/outputs/YYYY-MM-DD/source-visuals/raw/ITEM_ID",
+  workspaceRoots: ["/ABSOLUTE/WORKSPACE"],
+  receipt: {
+    complete: true,
+    asset_count: 1,
+    source_url: frozenOriginalUrl,
+    captured_url: saved.capturedUrl,
+    capture_executor: "codex_in_app_browser",
+    capture_method: "iab-expanded-viewport-screenshot",
+    capture_contract_id: "iab-expanded-viewport-v1",
+    capture_type: "viewport_screenshot",
+    files: [{file: saved.path.split("/").pop(), asset_role: request.capture_scope === "original_post_only" ? "x_original_post" : "article_main_content", ...saved}],
+  },
+});
+```
+
+如果 helper 的预检失败，必须记录 `errorCode` 并停止；不能回退到旧的 Terminal、Chrome、
+base64 或剪贴板流程。目标文件和 `capture.json` 已存在时会返回
+`destination_exists`，也不能覆盖或重试同一冻结 URL。
+
 ```json
 {
   "complete": true,

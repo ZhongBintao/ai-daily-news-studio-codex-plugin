@@ -113,6 +113,13 @@ mark the requests `unavailable` with `error_code=browser_capture_unavailable`,
 return `awaiting_screenshots`, and stop before the editorial script, TTS, or
 render stage. Do not try to make the missing capability work.
 
+The direct-file-write capability is provided by the isolated
+`scripts/browser_screenshot_capture.mjs` helper documented in
+`references/x-screenshot-capture.md`. It writes the raw `Uint8Array` and
+receipt in the same Node REPL session, validates workspace roots, rejects
+symlink escapes, and refuses to overwrite. It does not replace or monkey-patch
+the browser plugin's existing `tab.screenshot()` API.
+
 Read the frozen source-visual request list and use the Codex in-app browser
 only, following [the capture protocol](references/x-screenshot-capture.md).
 Reuse one visible in-app-browser tab and inspect only frozen original URLs. Before
